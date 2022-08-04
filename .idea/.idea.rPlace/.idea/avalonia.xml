@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AvaloniaProject">
+    <option name="projectPerEditor">
+      <map>
+        <entry key="rPlace/App.axaml" value="rPlace/rPlace.csproj" />
+        <entry key="rPlace/Views/MainWindow.axaml" value="rPlace/rPlace.csproj" />
+        <entry key="rPlace/Views/SKCanvas.axaml" value="rPlace/rPlace.csproj" />
+      </map>
+    </option>
+  </component>
+</project>
