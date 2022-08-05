@@ -85,9 +85,6 @@
             <Setter Property="Margin" Value="0 0 0 8"/>
             <Setter Property="Width" Value="180"/>
         </Style>
-        <Style Selector="Border.DoneButton:pointerover">
-            <Setter Property="BorderThickness" Value="6"/>
-        </Style>
         <Style Selector="Border.PaletteColour">
             <Setter Property="Width" Value="50"/>
             <Setter Property="Height" Value="30"/>
@@ -96,9 +93,8 @@
             <Setter Property="Margin" Value="2"/>
         </Style>
         <Style Selector="Border.PaletteColour:pointerover">
-            <Setter Property="BoxShadow" Value="inset 50 0 0 0 White"/> <!--0 0 8 4 LightGray, --> <!--<Setter Property="BorderThickness" Value="4"/>-->
+            <Setter Property="BoxShadow" Value="inset 50 0 0 0 White"/> 
             <Setter Property="BorderBrush" Value="White"/>
-            <Setter Property="Cursor" Value="Hand"/>
         </Style>
     </Window.Styles>
     
@@ -127,8 +123,8 @@
             <!--<Canvas HorizontalAlignment="Stretch" VerticalAlignment="Stretch"><Canvas x:Name="Board" Top="0" Left="0" Width="500" Background="Gray" Height="500"></Canvas></Canvas>-->
             <views:SkCanvas x:Name="Board" Bounds="0 0 500 500"/>
             
-            <Button ZIndex="3" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="10" Padding="10">Select Colour</Button>
-            <DockPanel ZIndex="8" Dock="Bottom" Height="150" VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Background="White">
+            <Button ZIndex="3" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="10" Padding="10" Click="OnSelectColourClicked">Select Colour</Button>
+            <DockPanel ZIndex="8" Dock="Bottom" Height="150" VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Background="White" IsVisible="False" x:Name="Palette">
                 <Grid RowDefinitions="* Auto">
                     <ScrollViewer Grid.Row="0">
                         <ItemsControl Items="{Binding AvColours}" HorizontalAlignment="Stretch" VerticalAlignment="Top"> 
@@ -172,7 +168,10 @@
                         <ToggleButton Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" Margin="5 5 0 0">Macro Execution</ToggleButton>
                     </Grid>
                     <ToggleSwitch Margin="5"> View selected area at canvas date</ToggleSwitch>
-                    <Button Margin="5" HorizontalAlignment="Stretch">Rollback selected area</Button>
+                    <Grid ColumnDefinitions="* Auto">
+                        <Button Grid.Column="0" Margin="5" HorizontalAlignment="Stretch">Rollback selected area</Button>
+                        <Button Grid.Column="1" Margin="5" HorizontalAlignment="Stretch">📂</Button>
+                    </Grid>
                 </StackPanel>
             </ScrollViewer>
         </Border>

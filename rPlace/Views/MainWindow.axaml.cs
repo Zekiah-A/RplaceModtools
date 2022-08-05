@@ -186,4 +186,6 @@ public partial class MainWindow : Window
         CacheCanvases = (bool) ((ToggleSwitch) sender).IsChecked!;
         if (CacheCanvases) await FetchCacheBackuplist();
     }
+
+    private void OnSelectColourClicked(object? sender, RoutedEventArgs e) => Palette.IsVisible = true;
 }
