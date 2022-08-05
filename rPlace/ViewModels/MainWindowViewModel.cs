@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using Avalonia.Media.Imaging;
+using SkiaSharp;
 
 namespace rPlace.ViewModels;
 public class MainWindowViewModel : ViewModelBase

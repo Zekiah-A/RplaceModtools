@@ -4,12 +4,14 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:views="clr-namespace:rPlace.Views"
+        xmlns:models="clr-namespace:rPlace.Models"
         mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="600" MinWidth="400"
         x:Class="rPlace.Views.MainWindow"
         Icon="/Assets/avalonia-logo.ico"
         Title="rPlace"
         TransparencyLevelHint="AcrylicBlur"
         Background="Transparent">
+    
     <Window.Styles>
         <Style Selector="Image.PlaceLogo">
             <Setter Property="Height" Value="100"/>
@@ -73,6 +75,31 @@
                 </Animation>
             </Style.Animations>
         </Style>
+        <!--Palette colour select panel styles-->
+        <Style Selector="Border.DoneButton">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#FF5500"/>
+            <Setter Property="BorderThickness" Value="4"/>
+            <Setter Property="CornerRadius" Value="36"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0 0 0 8"/>
+            <Setter Property="Width" Value="180"/>
+        </Style>
+        <Style Selector="Border.DoneButton:pointerover">
+            <Setter Property="BorderThickness" Value="6"/>
+        </Style>
+        <Style Selector="Border.PaletteColour">
+            <Setter Property="Width" Value="50"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="BorderBrush" Value="LightGray"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Margin" Value="2"/>
+        </Style>
+        <Style Selector="Border.PaletteColour:pointerover">
+            <Setter Property="BoxShadow" Value="inset 50 0 0 0 White"/> <!--0 0 8 4 LightGray, --> <!--<Setter Property="BorderThickness" Value="4"/>-->
+            <Setter Property="BorderBrush" Value="White"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
     </Window.Styles>
     
     <Design.DataContext>
@@ -100,10 +127,29 @@
             <!--<Canvas HorizontalAlignment="Stretch" VerticalAlignment="Stretch"><Canvas x:Name="Board" Top="0" Left="0" Width="500" Background="Gray" Height="500"></Canvas></Canvas>-->
             <views:SkCanvas x:Name="Board" Bounds="0 0 500 500"/>
             
-            <Button ZIndex="3" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="10" Padding="10">Place Pixel</Button>
-            <!--<DockPanel ZIndex="8" Dock="Bottom" Height="100" VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Background="White">
-                <TextBlock HorizontalAlignment="Center">[Imagine the pallete were here]</TextBlock>
-            </DockPanel>-->
+            <Button ZIndex="3" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="10" Padding="10">Select Colour</Button>
+            <DockPanel ZIndex="8" Dock="Bottom" Height="150" VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Background="White">
+                <Grid RowDefinitions="* Auto">
+                    <ScrollViewer Grid.Row="0">
+                        <ItemsControl Items="{Binding AvColours}" HorizontalAlignment="Stretch" VerticalAlignment="Top"> 
+                            <ItemsControl.DataContext><vm:PaletteViewModel/></ItemsControl.DataContext>
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate> 
+                                    <WrapPanel Orientation="Horizontal" Margin="10 16 10 0"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Classes="PaletteColour" Background="{Binding}"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                    <Border Grid.Row="1" Classes="DoneButton">
+                        <Button Padding="8" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" CornerRadius="36" Background="Transparent">Done</Button>
+                    </Border>
+                </Grid>
+            </DockPanel>
         </Panel>
         <Border Grid.Column="1" x:Name="ToolsPanel" BorderBrush="Black" Padding="10" BoxShadow="0 0 10 2 Gray" Width="300" Background="White">
             <ScrollViewer>

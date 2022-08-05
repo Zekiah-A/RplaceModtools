@@ -1,12 +1,16 @@
-using System.Net.Security;
-using System.Numerics;
+using System;
+using System.Collections.ObjectModel;
+using System.Linq;
+using Avalonia.Media;
 using SkiaSharp;
 
-namespace rPlace.Models;
+namespace rPlace.ViewModels;
 
-public class Utils
+public class PaletteViewModel : ViewModelBase
 {
-    /*public static readonly SKColor[] PColours =
+    private ObservableCollection<IBrush> AvColours => new(Colours.Select(item => new SolidColorBrush(new Color(255, item.Red, item.Green, item.Blue))));
+
+    public static readonly SKColor[] Colours =
     {
         new(109, 0, 26),
         new(190, 0, 57),
@@ -40,5 +44,6 @@ public class Utils
         new(137, 141, 144),
         new(212, 215, 217),
         new(255, 255, 255)
-    };*/
+    };
+
 }

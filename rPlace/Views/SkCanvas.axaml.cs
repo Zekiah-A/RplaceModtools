@@ -15,6 +15,7 @@ using Avalonia.Skia;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using rPlace.Models;
+using rPlace.ViewModels;
 using SkiaSharp;
 using Point = Avalonia.Point;
 
@@ -123,7 +124,7 @@ public partial class SkCanvas : UserControl
             {
                 using var img = new SKBitmap(500, 500, true);
                 for (var i = 0; i < board.Length; i++)
-                    img.SetPixel(i % 500, i / 500, Utils.PColours[board[i]]);
+                    img.SetPixel(i % 500, i / 500, PaletteViewModel.Colours[board[i]]);
                 canvasCache = SKImage.FromBitmap(img);
                 img.Dispose();
                 board = null;
@@ -148,7 +149,7 @@ public partial class SkCanvas : UserControl
             {
                 var p = pixelsToDraw.Pop();
                 var c = new SKPaint();
-                c.Color = Utils.PColours[BitConverter.ToUInt32(p, 5)]; //0 is code, 1-4 is cooldown, 5 is colour, 9 is position
+                c.Color = PaletteViewModel.Colours[BitConverter.ToUInt32(p, 5)]; //0 is code, 1-4 is cooldown, 5 is colour, 9 is position
                 canvas.DrawRect(BitConverter.ToUInt32(p, 9) % 500, (float) Math.Floor(BitConverter.ToUInt32(p, 9) / 500f), 1, 1, c);
             }
 

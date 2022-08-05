@@ -19,6 +19,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using SkiaSharp;
 using rPlace.Models;
+using rPlace.ViewModels;
 
 namespace rPlace.Views;
 public partial class MainWindow : Window
@@ -42,8 +43,8 @@ public partial class MainWindow : Window
         set
         {
             lookingAtPixel = value;
-            Board.Left = (float) Math.Floor(lookingAtPixel.X - MainGrid.ColumnDefinitions[0].ActualWidth / 2);
-            Board.Top = (float) Math.Floor(lookingAtPixel.Y - Height / 2);
+            Board.Left = (float) Math.Floor(MainGrid.ColumnDefinitions[0].ActualWidth / 2 - lookingAtPixel.X);
+            Board.Top = (float) Math.Floor(Height / 2 - lookingAtPixel.Y);
         }
     }
 
@@ -119,7 +120,7 @@ public partial class MainWindow : Window
         var placeFile = await (await Fetch(uri)).Content.ReadAsByteArrayAsync();
         using var bmp = new SKBitmap(500, 500, true);
         for (int i = 0; i < placeFile.Length; i++)
-            bmp.SetPixel(i % 500, i / 500, Utils.PColours[placeFile[i]]);
+            bmp.SetPixel(i % 500, i / 500, PaletteViewModel.Colours[placeFile[i]]);
         using var bitmap = bmp.Encode(SKEncodedImageFormat.Jpeg, 100);
         await using var imgStream = new MemoryStream();
         imgStream.Position = 0;
