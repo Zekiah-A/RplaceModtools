@@ -13,6 +13,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
+using Avalonia.Controls.Primitives;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -31,6 +32,7 @@ public partial class MainWindow : Window
     private Dictionary<string, Bitmap> cachedCanvasPreviews = new();
     private HttpClient client = new();
     private static Vector2 lookingAtPixel;
+    private bool? isSelecting = false;
 
     public bool CacheCanvases;
     private Vector2 LookingAtPixel
@@ -145,19 +147,29 @@ public partial class MainWindow : Window
         Board.StartSelection(new Point(0, 0), new Point(100, 100));
     }
     
-    private void OnBackgroundMouseDown(object? sender, PointerPressedEventArgs e) => mouseDown = true;
+    private void OnBackgroundMouseDown(object? sender, PointerPressedEventArgs e)
+    {
+        mouseDown = true;
+        if (isSelecting is true) Board.StartSelection(new Point(lookingAtPixel.X, lookingAtPixel.Y), new Point(lookingAtPixel.X, lookingAtPixel.Y));
+        
+    }
 
     private void OnBackgroundMouseMove(object? sender, PointerEventArgs e)
     {
         if (mouseDown)
         {   
+            if (isSelecting is true)
+            {
+                Board.UpdateSelection(null, e.GetPosition(Board));
+                return;
+            }
+            
             //Multiply be 1/zoom so that it always moves at a speed to make it seem to drag with the mouse regardless of zoom level
             Board.Left += (float) (e.GetPosition(canvasBackground).X - mouseLast.X) * (1 / Board.Zoom);
             Board.Top += (float) (e.GetPosition(canvasBackground).Y - mouseLast.Y) * (1 / Board.Zoom);
             //Clamp values
             //Board.Left = (float) Math.Clamp(Board.Left, MainGrid.ColumnDefinitions[0].ActualWidth / 2 - 500, MainGrid.ColumnDefinitions[0].ActualWidth / 2);
             //Board.Top = (float) Math.Clamp(Board.Top, Height / 2 - 500, Height / 2);
-            Console.WriteLine(LookingAtPixel);
         }
         mouseLast = new Vector2((float) e.GetPosition(canvasBackground).X, (float) e.GetPosition(canvasBackground).Y);
     }
@@ -178,6 +190,11 @@ public partial class MainWindow : Window
         var backupName = CanvasDropdown.SelectedItem as string ?? "place";
         PreviewImg.Source = cachedCanvasPreviews.ContainsKey(backupName) ? 
             cachedCanvasPreviews[backupName] : await CreateCanvasPreviewImage(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backups", backupName));
+        
+        Board.Board = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backups", backupName))).Content.ReadAsByteArrayAsync();;
+        //If we are not looking at most recent backup, show a warning that we will not be able to modify it at all
+        ToolsExtra.IsVisible = CanvasDropdown.SelectedIndex != 0;
+        LiveCanvasWarning.IsVisible = CanvasDropdown.SelectedIndex != 0;
     }
     
     private async void OnCacheCanvasChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
@@ -188,4 +205,6 @@ public partial class MainWindow : Window
     }
 
     private void OnSelectColourClicked(object? sender, RoutedEventArgs e) => Palette.IsVisible = true;
+
+    private void OnSelectToolClicked(object? sender, RoutedEventArgs e) => isSelecting = ((ToggleButton) sender!).IsChecked;
 }

@@ -158,6 +158,7 @@ public partial class SkCanvas : UserControl
             {
                 var sKBrush = new SKPaint();
                 sKBrush.Color = new SKColor(100, 167, 255, 140);
+                //sKBrush.BlendMode = SKBlendMode.Plus;
                 canvas.DrawRect((float)sel.Tl.X, (float)sel.Tl.Y, (float)sel.Br.X, (float)sel.Br.Y, sKBrush);
             }
             
@@ -209,17 +210,23 @@ public partial class SkCanvas : UserControl
             Br = bottomRight
         };
         selections.Push(sel);
+        Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
     }
 
-    public void UpdateSelection(Point topLeft, Point bottomRight)
+    public void UpdateSelection(Point? topLeft = null, Point? bottomRight = null)
     {
         var cur = selections.Pop();
-        cur.Tl = topLeft;
-        cur.Br = bottomRight;
+        cur.Tl = topLeft ?? cur.Tl;
+        cur.Br = bottomRight ?? cur.Br;
         selections.Push(cur);
+        Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
     }
 
-    public void ClearSelections() => selections = new Stack<Selection>();
+    public void ClearSelections()
+    {
+        selections = new Stack<Selection>();
+        Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
+    }
 }
 
 public struct Selection
