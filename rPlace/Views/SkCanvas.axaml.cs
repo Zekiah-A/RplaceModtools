@@ -25,11 +25,13 @@ public partial class SkCanvas : UserControl
 {
     //Board and changes are cached to improve performance as they only need to be processed once.
     private static byte[]? board;
-    public static char[]? changes;
+    private static char[]? changes;
+    private static byte[]? selectionBoard;
     private static Stack<Selection> selections = new();
     private static Stack<byte[]> pixelsToDraw = new();
     //private CustomDrawOp canvDrawOp; //see line 172
     private static SKImage? canvasCache;
+    private static SKImage? selectionCanvasCache;
     private static float canvZoom = 1;
     private static SKPoint canvPosition = new SKPoint(0, 0);
 
@@ -49,6 +51,17 @@ public partial class SkCanvas : UserControl
         set
         {
             changes = value;
+            Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
+        }
+    }
+
+    public byte[]? SelectionBoard
+    {
+        get => selectionBoard;
+        set
+        {
+            selectionBoard = value;
+            selectionCanvasCache = null;
             Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
         }
     }
@@ -149,17 +162,35 @@ public partial class SkCanvas : UserControl
             {
                 var p = pixelsToDraw.Pop();
                 var c = new SKPaint();
+                //TODO: If statement here to change how we handle the pixel depending on it's code
                 c.Color = PaletteViewModel.Colours[BitConverter.ToUInt32(p, 5)]; //0 is code, 1-4 is cooldown, 5 is colour, 9 is position
                 canvas.DrawRect(BitConverter.ToUInt32(p, 9) % 500, (float) Math.Floor(BitConverter.ToUInt32(p, 9) / 500f), 1, 1, c);
             }
 
+            if (selectionBoard is not null && selectionCanvasCache is null)
+            {
+                using var img = new SKBitmap(500, 500);
+                for (var i = 0; i < selectionBoard.Length; i++)
+                {   //TODO: This method is not fully efficient and only attempting to draw at all within the selection bounds would be better.
+                    foreach (var sel in selections)
+                    {   //Loop through the whole board, if pixel is within bounds of selection, draw, otherwise skip.
+                        if (i % 500 > sel.Tl.X && i % 500 < sel.Br.X && i / 500 > sel.Tl.Y && i / 500 < sel.Br.Y)//if (sel.Tl.X <= i % 500 && i % 500 <= sel.Br.X && i / 500f <= sel.Tl.Y && i / 500f <= sel.Br.Y)
+                            img.SetPixel(i % 500, i / 500, PaletteViewModel.Colours[selectionBoard[i]]);
+                        //else
+                        //    img.SetPixel(i % 500, i/500, SKColors.Blue);
+                    }
+                }
+                selectionCanvasCache = SKImage.FromBitmap(img);
+                img.Dispose();
+            }
+            if (selectionCanvasCache is not null) canvas.DrawImage(selectionCanvasCache, 0, 0);
+            
             //Draw selections
             foreach (var sel in selections)
             {
                 var sKBrush = new SKPaint();
                 sKBrush.Color = new SKColor(100, 167, 255, 140);
-                //sKBrush.BlendMode = SKBlendMode.Plus;
-                canvas.DrawRect((float)sel.Tl.X, (float)sel.Tl.Y, (float)sel.Br.X, (float)sel.Br.Y, sKBrush);
+                canvas.DrawRect((float) Math.Floor(sel.Tl.X), (float) Math.Floor(sel.Tl.Y), (float) Math.Floor(sel.Br.X), (float) Math.Floor(sel.Br.Y), sKBrush);
             }
             
             canvas.Flush();
@@ -219,12 +250,14 @@ public partial class SkCanvas : UserControl
         cur.Tl = topLeft ?? cur.Tl;
         cur.Br = bottomRight ?? cur.Br;
         selections.Push(cur);
+        selectionCanvasCache = null;
         Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
     }
 
     public void ClearSelections()
     {
         selections = new Stack<Selection>();
+        selectionCanvasCache = null;
         Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
     }
 }

@@ -18,6 +18,7 @@ using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using DynamicData.Kernel;
 using SkiaSharp;
 using rPlace.Models;
 using rPlace.ViewModels;
@@ -32,7 +33,6 @@ public partial class MainWindow : Window
     private Dictionary<string, Bitmap> cachedCanvasPreviews = new();
     private HttpClient client = new();
     private static Vector2 lookingAtPixel;
-    private bool? isSelecting = false;
 
     public bool CacheCanvases;
     private Vector2 LookingAtPixel
@@ -96,8 +96,8 @@ public partial class MainWindow : Window
         var backupArr = (object[]) stack.ToArray();
         CanvasDropdown.Items = backupArr;
 
-        if (!CacheCanvases) return;
         //Over time, this func will cache canvas previews as bitmaps so that we can load them faster when selected in the dropdown
+        if (!CacheCanvases) return;
         for (int i = 0; i < stack.Count; i++)
         {
             cachedCanvasPreviews.Add((string) backupArr[i], await CreateCanvasPreviewImage(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backups", (string) backupArr[i])));
@@ -144,13 +144,12 @@ public partial class MainWindow : Window
         
         //Set the most recent place file to be the board background
         Board.Board = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "place"))).Content.ReadAsByteArrayAsync();
-        Board.StartSelection(new Point(0, 0), new Point(100, 100));
     }
     
     private void OnBackgroundMouseDown(object? sender, PointerPressedEventArgs e)
     {
         mouseDown = true;
-        if (isSelecting is true) Board.StartSelection(new Point(lookingAtPixel.X, lookingAtPixel.Y), new Point(lookingAtPixel.X, lookingAtPixel.Y));
+        if (SelectTool.IsChecked is true) Board.StartSelection(new Point(lookingAtPixel.X, lookingAtPixel.Y), new Point(lookingAtPixel.X, lookingAtPixel.Y));
         
     }
 
@@ -158,7 +157,7 @@ public partial class MainWindow : Window
     {
         if (mouseDown)
         {   
-            if (isSelecting is true)
+            if (SelectTool.IsChecked is true)
             {
                 Board.UpdateSelection(null, e.GetPosition(Board));
                 return;
@@ -191,12 +190,53 @@ public partial class MainWindow : Window
         PreviewImg.Source = cachedCanvasPreviews.ContainsKey(backupName) ? 
             cachedCanvasPreviews[backupName] : await CreateCanvasPreviewImage(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backups", backupName));
         
-        Board.Board = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backups", backupName))).Content.ReadAsByteArrayAsync();;
-        //If we are not looking at most recent backup, show a warning that we will not be able to modify it at all
-        ToolsExtra.IsVisible = CanvasDropdown.SelectedIndex != 0;
-        LiveCanvasWarning.IsVisible = CanvasDropdown.SelectedIndex != 0;
+        //If we are viewing selected date only through the selection, then we are still technically on the pseudo-live canvas, viewselected only applies when we are on the live canvas
+        if (ViewSelectedDate.IsChecked is false)
+        {
+            Board.Board = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backups", backupName))).Content.ReadAsByteArrayAsync();
+            //If we are not looking at most recent backup, show a warning that we will not be able to modify it at all & disable tools.
+            ToolsInformation.IsVisible = CanvasDropdown.SelectedIndex != 0;
+            LiveCanvasWarning.IsVisible = CanvasDropdown.SelectedIndex != 0;
+            PaintbrushTool.IsEnabled = CanvasDropdown.SelectedIndex == 0;
+            RubberTool.IsEnabled = CanvasDropdown.SelectedIndex == 0;
+            SelectTool.IsEnabled = CanvasDropdown.SelectedIndex == 0;
+        }
+        else
+        {
+            //TODO: This is essentially same as OnViewSelectedDateClicked
+            Board.Board = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "place"))).Content.ReadAsByteArrayAsync();
+            Board.SelectionBoard = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backups", backupName))).Content.ReadAsByteArrayAsync();
+            ToolsInformation.IsVisible = false;
+            LiveCanvasWarning.IsVisible = false;
+            PaintbrushTool.IsEnabled = true;
+            RubberTool.IsEnabled = true;
+            SelectTool.IsEnabled = true;
+        }
     }
     
+    private async void OnViewSelectedDateChecked(object? sender, RoutedEventArgs e)
+    {
+            Board.Board = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "place"))).Content.ReadAsByteArrayAsync();
+            var backupName = CanvasDropdown.SelectedItem as string ?? "place";
+            Board.SelectionBoard = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backups", backupName))).Content.ReadAsByteArrayAsync();
+            ToolsInformation.IsVisible = false;
+            LiveCanvasWarning.IsVisible = false;
+            PaintbrushTool.IsEnabled = true;
+            RubberTool.IsEnabled = true;
+            SelectTool.IsEnabled = true;
+    }
+
+    private async void OnViewSelectedDateUnchecked(object? sender, RoutedEventArgs e)
+    {
+        Board.Board = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backups", (string) CanvasDropdown.SelectedItem!))).Content.ReadAsByteArrayAsync();
+        //If we are not looking at most recent backup, show a warning that we will not be able to modify it at all & disable tools.
+        ToolsInformation.IsVisible = CanvasDropdown.SelectedIndex != 0;
+        LiveCanvasWarning.IsVisible = CanvasDropdown.SelectedIndex != 0;
+        PaintbrushTool.IsEnabled = CanvasDropdown.SelectedIndex == 0;
+        RubberTool.IsEnabled = CanvasDropdown.SelectedIndex == 0;
+        SelectTool.IsEnabled = CanvasDropdown.SelectedIndex == 0;
+    }
+
     private async void OnCacheCanvasChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
         if (sender is null) return;
@@ -205,6 +245,4 @@ public partial class MainWindow : Window
     }
 
     private void OnSelectColourClicked(object? sender, RoutedEventArgs e) => Palette.IsVisible = true;
-
-    private void OnSelectToolClicked(object? sender, RoutedEventArgs e) => isSelecting = ((ToggleButton) sender!).IsChecked;
 }
