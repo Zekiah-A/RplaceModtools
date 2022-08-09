@@ -49,7 +49,7 @@ public partial class MainWindow : Window
             Board.Top = (float) Math.Floor(Height / 2 - lookingAtPixel.Y);
         }
     }
-
+    
     public MainWindow()
     {
         InitializeComponent();
@@ -156,7 +156,21 @@ public partial class MainWindow : Window
     private void OnBackgroundMouseMove(object? sender, PointerEventArgs e)
     {
         if (mouseDown)
-        {   
+        {
+            //If left mouse button, go to colour picker mode from the canvas instead
+            if (e.GetCurrentPoint(this).Properties.IsMiddleButtonPressed)
+            {
+                Canvas.SetLeft(CursorIndicatorRectangle, e.GetPosition(canvasBackground).X + 8);
+                Canvas.SetTop(CursorIndicatorRectangle, e.GetPosition(canvasBackground).Y + 8);
+                Cursor = new Cursor(StandardCursorType.Cross);
+                //Get pixel mouse is over.
+                /*var pxCol = Board.ColourAt(
+                    (int) Math.Clamp(Math.Floor(e.GetPosition(canvasBackground).X - Board.Left), 0, 500),
+                    (int) Math.Clamp(Math.Floor(e.GetPosition(canvasBackground).Y - Board.Top), 0, 500)
+                );
+                CursorIndicatorRectangle.Fill = new SolidColorBrush(new Color(pxCol.Alpha, pxCol.Red, pxCol.Green, pxCol.Blue));*/
+                return;
+            }
             if (SelectTool.IsChecked is true)
             {
                 Board.UpdateSelection(null, e.GetPosition(Board));
@@ -170,6 +184,7 @@ public partial class MainWindow : Window
             //Board.Left = (float) Math.Clamp(Board.Left, MainGrid.ColumnDefinitions[0].ActualWidth / 2 - 500, MainGrid.ColumnDefinitions[0].ActualWidth / 2);
             //Board.Top = (float) Math.Clamp(Board.Top, Height / 2 - 500, Height / 2);
         }
+        else Cursor = new Cursor(StandardCursorType.Arrow);
         mouseLast = new Vector2((float) e.GetPosition(canvasBackground).X, (float) e.GetPosition(canvasBackground).Y);
     }
     private void OnBackgroundMouseRelease(object? sender, PointerReleasedEventArgs e) => mouseDown = false;
@@ -245,4 +260,12 @@ public partial class MainWindow : Window
     }
 
     private void OnSelectColourClicked(object? sender, RoutedEventArgs e) => Palette.IsVisible = true;
+    private void OnPaletteDoneButtonClicked(object? sender, RoutedEventArgs e) => Palette.IsVisible = false;
+    
+    private void OnResetCanvasViewPressed(object? sender, PointerPressedEventArgs e)
+    {
+        Board.Left = 0;
+        Board.Top = 0;
+        Board.Zoom = 1;
+    }
 }

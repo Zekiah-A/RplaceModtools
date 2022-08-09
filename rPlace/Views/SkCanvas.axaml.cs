@@ -1,20 +1,14 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection.Metadata.Ecma335;
-using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Timers;
+using System.Numerics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Platform;
-using Avalonia.Rendering;
 using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
 using Avalonia.Threading;
-using Avalonia.VisualTree;
-using rPlace.Models;
 using rPlace.ViewModels;
 using SkiaSharp;
 using Point = Avalonia.Point;
@@ -95,6 +89,8 @@ public partial class SkCanvas : UserControl
             Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
         }
     }
+    
+    public SKColor ColourAt(int x, int y) => PaletteViewModel.Colours[Board[x + y]];
 
     public SkCanvas()
     {
@@ -102,7 +98,7 @@ public partial class SkCanvas : UserControl
         ClipToBounds = true;
         //canvDrawOp = new CustomDrawOp(new Rect(0, 0, Bounds.Width, Bounds.Height));
     }
-    
+
     private void InitializeComponent()
     {
         AvaloniaXamlLoader.Load(this);
@@ -174,10 +170,8 @@ public partial class SkCanvas : UserControl
                 {   //TODO: This method is not fully efficient and only attempting to draw at all within the selection bounds would be better.
                     foreach (var sel in selections)
                     {   //Loop through the whole board, if pixel is within bounds of selection, draw, otherwise skip.
-                        if (i % 500 > sel.Tl.X && i % 500 < sel.Br.X && i / 500 > sel.Tl.Y && i / 500 < sel.Br.Y)//if (sel.Tl.X <= i % 500 && i % 500 <= sel.Br.X && i / 500f <= sel.Tl.Y && i / 500f <= sel.Br.Y)
+                        if (i % 500 >= sel.Tl.X && i % 500 <= sel.Br.X && i / 500 >= sel.Tl.Y && i / 500 <= sel.Br.Y)//if (sel.Tl.X <= i % 500 && i % 500 <= sel.Br.X && i / 500f <= sel.Tl.Y && i / 500f <= sel.Br.Y)
                             img.SetPixel(i % 500, i / 500, PaletteViewModel.Colours[selectionBoard[i]]);
-                        //else
-                        //    img.SetPixel(i % 500, i/500, SKColors.Blue);
                     }
                 }
                 selectionCanvasCache = SKImage.FromBitmap(img);
@@ -205,8 +199,7 @@ public partial class SkCanvas : UserControl
         using var canvDrawOp = new CustomDrawOp(new Rect(0, 0, Bounds.Width, Bounds.Height)); //Let's disable the global customdrawop for now until we fix above todo
         context.Custom(canvDrawOp);
     }
-    
-    
+
     //Decompress changes so it can be put onto canv
     public void RunLengthChanges(char[] data)
     {
