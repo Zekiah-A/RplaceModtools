@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
@@ -28,6 +30,8 @@ public partial class SkCanvas : UserControl
     private static SKImage? selectionCanvasCache;
     private static float canvZoom = 1;
     private static SKPoint canvPosition = new SKPoint(0, 0);
+    private static SKColor? pixelAtColour;
+    private static Vector2? pixelAtPosition;
 
     public byte[]? Board
     {
@@ -90,8 +94,6 @@ public partial class SkCanvas : UserControl
         }
     }
     
-    public SKColor ColourAt(int x, int y) => PaletteViewModel.Colours[Board[x + y]];
-
     public SkCanvas()
     {
         InitializeComponent();
@@ -187,6 +189,22 @@ public partial class SkCanvas : UserControl
                 canvas.DrawRect((float) Math.Floor(sel.Tl.X), (float) Math.Floor(sel.Tl.Y), (float) Math.Floor(sel.Br.X), (float) Math.Floor(sel.Br.Y), sKBrush);
             }
             
+            //Get pixel colour at screen cordinate, to return to ColourAt
+            if (pixelAtPosition is not null)
+            {
+                var dstinf = new SKImageInfo
+                {
+                    ColorType = SKColorType.Rgba8888,
+                    AlphaType = SKAlphaType.Opaque,
+                    Width = 1,
+                    Height = 1
+                };
+                var bitmap = new SKBitmap(dstinf);
+                var dstpixels = bitmap.GetPixels();
+                (context as ISkiaDrawingContextImpl)?.SkSurface.ReadPixels(dstinf, dstpixels, dstinf.RowBytes, (int) pixelAtPosition.Value.X, (int) pixelAtPosition.Value.Y);
+                pixelAtColour = bitmap.GetPixel(0, 0);
+                pixelAtPosition = null;
+            }
             canvas.Flush();
             canvas.Restore();
         }
@@ -252,6 +270,13 @@ public partial class SkCanvas : UserControl
         selections = new Stack<Selection>();
         selectionCanvasCache = null;
         Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
+    }
+    
+    public SKColor? ColourAt(int x, int y)
+    {
+        pixelAtPosition = new Vector2(x, y);
+        VisualRoot?.Renderer.AddDirty(this);
+        return pixelAtColour;
     }
 }
 
