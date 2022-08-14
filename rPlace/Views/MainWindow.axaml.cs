@@ -1,40 +1,36 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Data;
 using System.IO;
 using System.Net.Http;
 using Avalonia.Controls;
 using Avalonia.Input;
-using ReactiveUI;
 using System.Net.WebSockets;
 using System.Numerics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
-using Avalonia.Controls.Primitives;
 using Avalonia.Interactivity;
-using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
-using DynamicData.Kernel;
+using DynamicData;
 using SkiaSharp;
-using rPlace.Models;
 using rPlace.ViewModels;
 
 namespace rPlace.Views;
 public partial class MainWindow : Window
 {
+    public int? CurrentColour;
     private ClientWebSocket? ws;
-    private Panel canvasBackground;
-    private bool mouseDown = false;
-    private Vector2 mouseLast = new Vector2(0, 0);
+    private bool mouseDown;
+    private Vector2 mouseLast = Vector2.Zero;
     private Dictionary<string, Bitmap> cachedCanvasPreviews = new();
-    private HttpClient client = new();
+    private readonly HttpClient client = new();
     private static Vector2 lookingAtPixel;
-
-    public bool CacheCanvases;
+    private readonly Cursor[] cursors = { new(StandardCursorType.Arrow), new(StandardCursorType.Cross) };
+    private bool cacheCanvases;
+    
     private Vector2 LookingAtPixel
     {
         get
@@ -49,18 +45,14 @@ public partial class MainWindow : Window
             Board.Top = (float) Math.Floor(Height / 2 - lookingAtPixel.Y);
         }
     }
-    //(int) Math.Clamp(Math.Floor(e.GetPosition(canvasBackground).X - Board.Left), 0, 500), //MouseOverPixel
-    //(int) Math.Clamp(Math.Floor(e.GetPosition(canvasBackground).Y - Board.Top), 0, 500)
 
     public MainWindow()
     {
         InitializeComponent();
-        canvasBackground = this.FindControl<Panel>("CanvasBackground");
-        
-        canvasBackground.AddHandler(PointerPressedEvent, OnBackgroundMouseDown, handledEventsToo: false);
-        canvasBackground.AddHandler(PointerMovedEvent, OnBackgroundMouseMove, handledEventsToo: false);
-        canvasBackground.AddHandler(PointerReleasedEvent, OnBackgroundMouseRelease, handledEventsToo: false);
-        canvasBackground.PointerWheelChanged += OnBackgroundWheelChanged;
+        CanvasBackground.AddHandler(PointerPressedEvent, OnBackgroundMouseDown, handledEventsToo: false);
+        CanvasBackground.AddHandler(PointerMovedEvent, OnBackgroundMouseMove, handledEventsToo: false);
+        CanvasBackground.AddHandler(PointerReleasedEvent, OnBackgroundMouseRelease, handledEventsToo: false);
+        CanvasBackground.PointerWheelChanged += OnBackgroundWheelChanged;
         var windowSize = this.GetObservable(ClientSizeProperty);
         windowSize.Subscribe(size =>
         {
@@ -85,7 +77,7 @@ public partial class MainWindow : Window
         {
             ArraySegment<byte> bytesReceived = new ArraySegment<byte>(new byte[1024]);
             WebSocketReceiveResult result = await ws.ReceiveAsync(bytesReceived, CancellationToken.None);
-            Console.WriteLine(Encoding.UTF8.GetString(bytesReceived.Array, 0, result.Count));
+            Console.WriteLine(Encoding.UTF8.GetString(bytesReceived.Array!, 0, result.Count));
         }
     }
 
@@ -99,12 +91,9 @@ public partial class MainWindow : Window
         CanvasDropdown.Items = backupArr;
 
         //Over time, this func will cache canvas previews as bitmaps so that we can load them faster when selected in the dropdown
-        if (!CacheCanvases) return;
+        if (!cacheCanvases) return;
         for (int i = 0; i < stack.Count; i++)
-        {
             cachedCanvasPreviews.Add((string) backupArr[i], await CreateCanvasPreviewImage(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backups", (string) backupArr[i])));
-            Console.WriteLine("Cached: " + i + " " + backupArr[i]);
-        }
     }
     
     private async Task<HttpResponseMessage> Fetch(string? uri)
@@ -135,7 +124,7 @@ public partial class MainWindow : Window
     }
 
     //App started
-    private async void OnStartButtonPressed(object? sender, RoutedEventArgs e)
+    private async void OnStartButtonPressed(object? _, RoutedEventArgs e)
     {
         PlaceConfigPanel.IsVisible = false;
         await CreateConnection(new Uri(ConfigWsInput.Text), ConfigAdminKeyInput.Text);
@@ -162,16 +151,17 @@ public partial class MainWindow : Window
             //If left mouse button, go to colour picker mode from the canvas instead
             if (e.GetCurrentPoint(this).Properties.IsMiddleButtonPressed)
             {
-                if (e.GetPosition(canvasBackground).X - Board.Left < 0 || e.GetPosition(canvasBackground).X - Board.Left > 500 * Board.Zoom ||
-                    e.GetPosition(canvasBackground).Y - Board.Left < 0 || e.GetPosition(canvasBackground).Y - Board.Left > 500 * Board.Zoom) return;
+                if (e.GetPosition(CanvasBackground).X - Board.Left < 0 || e.GetPosition(CanvasBackground).X - Board.Left > 500 * Board.Zoom ||
+                    e.GetPosition(CanvasBackground).Y - Board.Left < 0 || e.GetPosition(CanvasBackground).Y - Board.Left > 500 * Board.Zoom) return;
                 CursorIndicatorRectangle.IsVisible = true;
-                Canvas.SetLeft(CursorIndicatorRectangle, e.GetPosition(canvasBackground).X + 8);
-                Canvas.SetTop(CursorIndicatorRectangle, e.GetPosition(canvasBackground).Y + 8);
-                Cursor = new Cursor(StandardCursorType.Cross);
+                Canvas.SetLeft(CursorIndicatorRectangle, e.GetPosition(CanvasBackground).X + 8);
+                Canvas.SetTop(CursorIndicatorRectangle, e.GetPosition(CanvasBackground).Y + 8);
+                Cursor = cursors[1];
                 //If mouse if over board, then get pixel colour at that position.
-                var pxCol = Board.ColourAt((int)Math.Floor(e.GetPosition(canvasBackground).X), (int)Math.Floor(e.GetPosition(canvasBackground).Y));
+                var pxCol = Board.ColourAt((int)Math.Floor(e.GetPosition(CanvasBackground).X), (int)Math.Floor(e.GetPosition(CanvasBackground).Y));
                 if (pxCol is null) return;
-                CursorIndicatorRectangle.Background = new SolidColorBrush(new Color(255, pxCol.Value.Red, pxCol.Value.Green, pxCol.Value.Blue));
+                //CurrentColour = PaletteViewModel.Colours.IndexOf((SKColor) pxCol);
+                CursorIndicatorRectangle.Background = new SolidColorBrush(new Color(pxCol.Value.Alpha, pxCol.Value.Red, pxCol.Value.Green, pxCol.Value.Blue));
                 return;
             }
             if (SelectTool.IsChecked is true)
@@ -181,21 +171,29 @@ public partial class MainWindow : Window
             }
             
             //Multiply be 1/zoom so that it always moves at a speed to make it seem to drag with the mouse regardless of zoom level
-            Board.Left += (float) (e.GetPosition(canvasBackground).X - mouseLast.X) * (1 / Board.Zoom);
-            Board.Top += (float) (e.GetPosition(canvasBackground).Y - mouseLast.Y) * (1 / Board.Zoom);
+            Board.Left += (float) (e.GetPosition(CanvasBackground).X - mouseLast.X) * (1 / Board.Zoom);
+            Board.Top += (float) (e.GetPosition(CanvasBackground).Y - mouseLast.Y) * (1 / Board.Zoom);
             //Clamp values
-            //Board.Left = (float) Math.Clamp(Board.Left, MainGrid.ColumnDefinitions[0].ActualWidth / 2 - 500, MainGrid.ColumnDefinitions[0].ActualWidth / 2);
-            //Board.Top = (float) Math.Clamp(Board.Top, Height / 2 - 500, Height / 2);
+            Board.Left = (float) Math.Clamp(Board.Left, MainGrid.ColumnDefinitions[0].ActualWidth / 2 - 500 * Board.Zoom, MainGrid.ColumnDefinitions[0].ActualWidth / 2);
+            Board.Top = (float) Math.Clamp(Board.Top, Height / 2 - 500 * Board.Zoom, Height / 2);
         }
         else
         {
-            Cursor = new Cursor(StandardCursorType.Arrow);
+            Cursor = cursors[0];
             CursorIndicatorRectangle.IsVisible = false;
         }
-        mouseLast = new Vector2((float) e.GetPosition(canvasBackground).X, (float) e.GetPosition(canvasBackground).Y);
+        mouseLast = new Vector2((float) e.GetPosition(CanvasBackground).X, (float) e.GetPosition(CanvasBackground).Y);
     }
-    private void OnBackgroundMouseRelease(object? sender, PointerReleasedEventArgs e) => mouseDown = false;
-
+    private void OnBackgroundMouseRelease(object? sender, PointerReleasedEventArgs e)
+    {
+        mouseDown = false;
+        
+        //If we are not dragging, place pixel.
+        if (e.GetPosition(CanvasBackground).X - mouseLast.X < 10 || e.GetPosition(CanvasBackground).Y - mouseLast.Y < 10 || CurrentColour is null) return;
+        //(int) Math.Clamp(Math.Floor(e.GetPosition(canvasBackground).X - Board.Left), 0, 500)
+        //(int) Math.Clamp(Math.Floor(e.GetPosition(canvasBackground).Y - Board.Top), 0, 500)
+    }
+    
     //https://github.com/rslashplace2/rslashplace2.github.io/blob/1cc30a12f35a6b0938e538100d3337228087d40d/index.html#L531
     private void OnBackgroundWheelChanged(object? sender, PointerWheelEventArgs e)
     {
@@ -205,7 +203,7 @@ public partial class MainWindow : Window
         Board.Zoom += (float) e.Delta.Y / 10;
     }
 
-    private async void OnCanvasDropdownSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    private async void OnCanvasDropdownSelectionChanged(object? _, SelectionChangedEventArgs e)
     {
         if (CanvasDropdown is null) return;
         var backupName = CanvasDropdown.SelectedItem as string ?? "place";
@@ -236,7 +234,7 @@ public partial class MainWindow : Window
         }
     }
     
-    private async void OnViewSelectedDateChecked(object? sender, RoutedEventArgs e)
+    private async void OnViewSelectedDateChecked(object? _, RoutedEventArgs e)
     {
             Board.Board = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "place"))).Content.ReadAsByteArrayAsync();
             var backupName = CanvasDropdown.SelectedItem as string ?? "place";
@@ -248,7 +246,7 @@ public partial class MainWindow : Window
             SelectTool.IsEnabled = true;
     }
 
-    private async void OnViewSelectedDateUnchecked(object? sender, RoutedEventArgs e)
+    private async void OnViewSelectedDateUnchecked(object? _, RoutedEventArgs e)
     {
         Board.Board = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backups", (string) CanvasDropdown.SelectedItem!))).Content.ReadAsByteArrayAsync();
         //If we are not looking at most recent backup, show a warning that we will not be able to modify it at all & disable tools.
@@ -262,14 +260,15 @@ public partial class MainWindow : Window
     private async void OnCacheCanvasChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
         if (sender is null) return;
-        CacheCanvases = (bool) ((ToggleSwitch) sender).IsChecked!;
-        if (CacheCanvases) await FetchCacheBackuplist();
+        cacheCanvases = (bool) ((ToggleSwitch) sender).IsChecked!;
+        if (cacheCanvases) await FetchCacheBackuplist();
     }
 
-    private void OnSelectColourClicked(object? sender, RoutedEventArgs e) => Palette.IsVisible = true;
-    private void OnPaletteDoneButtonClicked(object? sender, RoutedEventArgs e) => Palette.IsVisible = false;
+    private void OnSelectColourClicked(object? _, RoutedEventArgs e) => Palette.IsVisible = true;
+    private void OnPaletteDoneButtonClicked(object? _, RoutedEventArgs e) => Palette.IsVisible = false;
+    private void OnPaletteSelectionChanged(object? sender, SelectionChangedEventArgs e) => CurrentColour = (sender as ListBox)?.SelectedIndex ?? CurrentColour;
     
-    private void OnResetCanvasViewPressed(object? sender, PointerPressedEventArgs e)
+    private void OnResetCanvasViewPressed(object? _, PointerPressedEventArgs e)
     {
         Board.Left = 0;
         Board.Top = 0;

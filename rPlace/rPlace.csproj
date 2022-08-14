@@ -9,6 +9,7 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
     <ItemGroup>
+        <Folder Include="Models" />
         <Folder Include="Models\" />
         <AvaloniaResource Include="Assets\**" />
         <None Remove=".gitignore" />
@@ -24,7 +25,7 @@
         <PackageReference Include="Avalonia" Version="0.10.16" />
         <PackageReference Include="Avalonia.Desktop" Version="0.10.16" />
         <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
-        <PackageReference Condition="'$(Configuration)' == 'Debug'" Include="Avalonia.Diagnostics" Version="0.10.13" />
+        <PackageReference Condition="'$(Configuration)' == 'Debug'" Include="Avalonia.Diagnostics" Version="0.10.16" />
         <PackageReference Include="Avalonia.ReactiveUI" Version="0.10.16" />
         <PackageReference Include="Grpc.Core" Version="2.46.3" />
         <PackageReference Include="SkiaSharp.Views.Desktop.Common" Version="2.88.1-preview.1" />

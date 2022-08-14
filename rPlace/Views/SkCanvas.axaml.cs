@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Numerics;
-using System.Runtime.InteropServices;
-using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
@@ -29,10 +28,11 @@ public partial class SkCanvas : UserControl
     private static SKImage? canvasCache;
     private static SKImage? selectionCanvasCache;
     private static float canvZoom = 1;
-    private static SKPoint canvPosition = new SKPoint(0, 0);
+    private static SKPoint canvPosition = new(0, 0);
     private static SKColor? pixelAtColour;
     private static Vector2? pixelAtPosition;
-
+    private static Stopwatch? stopwatch;
+    
     public byte[]? Board
     {
         get => board;
@@ -80,8 +80,6 @@ public partial class SkCanvas : UserControl
         {
             canvPosition = new SKPoint(value, canvPosition.Y);
             Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
-            //TODO: Custom draw doesn't run on UI thread, but render thread, all this invalidatevisual is useless, i JUST NEED OT GET ONTO THE DAN RENDER THREAD TO CALL IT http://reference.avaloniaui.net/api/Avalonia.Rendering/DeferredRenderer/
-            //https://github.com/wieslawsoltes/Draw2D/blob/509d26f132039f9a97f28088491e1da849b5d2a2/src/Draw2D/Editor/SkiaShapeRenderer.cs#L13-L380
         }
     }
     public float Zoom
@@ -189,12 +187,12 @@ public partial class SkCanvas : UserControl
                 canvas.DrawRect((float) Math.Floor(sel.Tl.X), (float) Math.Floor(sel.Tl.Y), (float) Math.Floor(sel.Br.X), (float) Math.Floor(sel.Br.Y), sKBrush);
             }
             
-            //Get pixel colour at screen cordinate, to return to ColourAt
+            //Get pixel colour at screen co-ordinate, to return to ColourAt
             if (pixelAtPosition is not null)
             {
                 var dstinf = new SKImageInfo
                 {
-                    ColorType = SKColorType.Rgba8888,
+                    ColorType = SKColorType.Rgb888x,
                     AlphaType = SKAlphaType.Opaque,
                     Width = 1,
                     Height = 1
@@ -274,8 +272,12 @@ public partial class SkCanvas : UserControl
     
     public SKColor? ColourAt(int x, int y)
     {
+        //Limit the amount of times we re-render to get the colour to 60fps framerate.
+        if (stopwatch is null) { stopwatch = new(); stopwatch.Start(); return null; } 
+        if (stopwatch.ElapsedMilliseconds < 16) return null;
         pixelAtPosition = new Vector2(x, y);
         VisualRoot?.Renderer.AddDirty(this);
+        stopwatch.Restart();
         return pixelAtColour;
     }
 }

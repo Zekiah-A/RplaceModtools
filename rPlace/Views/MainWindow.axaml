@@ -4,10 +4,9 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:views="clr-namespace:rPlace.Views"
-        xmlns:models="clr-namespace:rPlace.Models"
         mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="600" MinWidth="400"
         x:Class="rPlace.Views.MainWindow"
-        Icon="/Assets/avalonia-logo.ico"
+        Icon="/Assets/favicon.ico"
         Title="rPlace"
         TransparencyLevelHint="AcrylicBlur"
         Background="Transparent">
@@ -93,8 +92,11 @@
             <Setter Property="Margin" Value="2"/>
         </Style>
         <Style Selector="Border.PaletteColour:pointerover">
-            <Setter Property="BoxShadow" Value="inset 50 0 0 0 White"/> 
-            <Setter Property="BorderBrush" Value="White"/>
+            <Setter Property="BoxShadow" Value="inset 50 0 0 0 White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="ListBoxItem">
+            <Setter Property="Padding" Value="0" />
         </Style>
     </Window.Styles>
     
@@ -123,7 +125,9 @@
         <Panel Grid.Column="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="White" Opacity="0.8" x:Name="CanvasBackground">
             <views:SkCanvas x:Name="Board" Bounds="0 0 500 500"/>
             
-            <Canvas VerticalAlignment="Stretch" HorizontalAlignment="Stretch"> <Border x:Name="CursorIndicatorRectangle" IsVisible="False" BorderBrush="Gray" CornerRadius="2" BorderThickness="1" Background="Transparent" Height="16" Width="16"/> </Canvas>
+            <Canvas VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+                <Border x:Name="CursorIndicatorRectangle" IsVisible="False" BorderBrush="Gray" CornerRadius="2" BorderThickness="1" Background="Transparent" Height="16" Width="16" Opacity="1"/>
+            </Canvas>
             
             <Border x:Name="ToolsInformation" IsVisible="False" Width="256" VerticalAlignment="Top" HorizontalAlignment="Right" BorderThickness="2" CornerRadius="8" Margin="16" Padding="8">
                 <Border.Background><SolidColorBrush Color="Gray" Opacity="0.5" /></Border.Background>
@@ -134,19 +138,19 @@
             <DockPanel ZIndex="8" Dock="Bottom" Height="150" VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Background="White" IsVisible="False" x:Name="Palette">
                 <Grid RowDefinitions="* Auto">
                     <ScrollViewer Grid.Row="0">
-                        <ItemsControl Items="{Binding AvColours}" HorizontalAlignment="Stretch" VerticalAlignment="Top"> 
-                            <ItemsControl.DataContext><vm:PaletteViewModel/></ItemsControl.DataContext>
-                            <ItemsControl.ItemsPanel>
+                        <ListBox Items="{Binding AvColours}" HorizontalAlignment="Stretch" VerticalAlignment="Top" SelectionChanged="OnPaletteSelectionChanged">
+                            <ListBox.DataContext><vm:PaletteViewModel/></ListBox.DataContext>
+                            <ListBox.ItemsPanel>
                                 <ItemsPanelTemplate> 
-                                    <WrapPanel Orientation="Horizontal" Margin="10 16 10 0"/>
+                                    <WrapPanel x:Name="PalettePanel" Orientation="Horizontal" Margin="10 16 10 0"/>
                                 </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
+                            </ListBox.ItemsPanel>
+                            <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <Border Classes="PaletteColour" Background="{Binding}"/>
                                 </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                     </ScrollViewer>
                     <Border Grid.Row="1" Classes="DoneButton">
                         <Button Padding="8" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" CornerRadius="36" Background="Transparent" Click="OnPaletteDoneButtonClicked">Done</Button>
@@ -201,10 +205,9 @@
 GNU GENERAL PUBLIC LICENSE
 Version 3, 29 June 2007
 
-Copyright (C) 2007 Free Software Foundation, Inc.
+Copyright (C) 2007 Free Software Foundation, Inc. https://fsf.org/
 Everyone is permitted to copy and distribute verbatim copies
 of this license document, but changing it is not allowed.
-
                           Preamble
 
 The GNU General Public License is a free, copyleft license for
