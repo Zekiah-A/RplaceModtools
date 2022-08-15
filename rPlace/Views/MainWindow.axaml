@@ -95,9 +95,6 @@
             <Setter Property="BoxShadow" Value="inset 50 0 0 0 White"/>
             <Setter Property="BorderThickness" Value="0"/>
         </Style>
-        <Style Selector="ListBoxItem">
-            <Setter Property="Padding" Value="0" />
-        </Style>
     </Window.Styles>
     
     <Design.DataContext>
@@ -138,8 +135,13 @@
             <DockPanel ZIndex="8" Dock="Bottom" Height="150" VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Background="White" IsVisible="False" x:Name="Palette">
                 <Grid RowDefinitions="* Auto">
                     <ScrollViewer Grid.Row="0">
-                        <ListBox Items="{Binding AvColours}" HorizontalAlignment="Stretch" VerticalAlignment="Top" SelectionChanged="OnPaletteSelectionChanged">
+                        <ListBox x:Name="PaletteListBox" Items="{Binding AvColours}" HorizontalAlignment="Stretch" VerticalAlignment="Top" SelectionChanged="OnPaletteSelectionChanged" SelectedIndex="{Binding CurrentColour}">
                             <ListBox.DataContext><vm:PaletteViewModel/></ListBox.DataContext>
+                            <ListBox.Styles>
+                                <Style Selector="ListBoxItem">
+                                    <Setter Property="Padding" Value="0" />
+                                </Style>
+                            </ListBox.Styles>
                             <ListBox.ItemsPanel>
                                 <ItemsPanelTemplate> 
                                     <WrapPanel x:Name="PalettePanel" Orientation="Horizontal" Margin="10 16 10 0"/>
@@ -192,7 +194,7 @@
                 <Button.Flyout>
                     <MenuFlyout Placement="Bottom">
                         <MenuItem Header="Settings">
-                            <ToggleSwitch IsChecked="False" PropertyChanged="OnCacheCanvasChanged">Cache canvases/previews</ToggleSwitch>
+                            <ToggleSwitch IsChecked="False" PropertyChanged="OnCacheCanvasChanged">Cache canvas previews</ToggleSwitch>
                             <ToggleSwitch>Dark mode</ToggleSwitch>
                             <TextBox Watermark="Backup check interval"></TextBox>
                             <TextBlock PointerPressed="OnResetCanvasViewPressed">Reset canvas view</TextBlock>

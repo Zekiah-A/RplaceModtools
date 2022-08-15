@@ -18,17 +18,15 @@ namespace rPlace.Views;
 
 public partial class SkCanvas : UserControl
 {
-    //Board and changes are cached to improve performance as they only need to be processed once.
     private static byte[]? board;
     private static char[]? changes;
     private static byte[]? selectionBoard;
     private static Stack<Selection> selections = new();
-    private static Stack<byte[]> pixelsToDraw = new();
-    //private CustomDrawOp canvDrawOp; //see line 172
+    private static List<Pixel> pixelsToDraw = new();
     private static SKImage? canvasCache;
     private static SKImage? selectionCanvasCache;
     private static float canvZoom = 1;
-    private static SKPoint canvPosition = new(0, 0);
+    private static SKPoint canvPosition = SKPoint.Empty;
     private static SKColor? pixelAtColour;
     private static Vector2? pixelAtPosition;
     private static Stopwatch? stopwatch;
@@ -153,15 +151,9 @@ public partial class SkCanvas : UserControl
             }
             else canvas.DrawImage(canvasCache, 0, 0);
             
-            //Equivalent of seti, we go through each pixel that needs to be added for this frame, popping them all off.
-            while (pixelsToDraw.Count > 0)
-            {
-                var p = pixelsToDraw.Pop();
-                var c = new SKPaint();
-                //TODO: If statement here to change how we handle the pixel depending on it's code
-                c.Color = PaletteViewModel.Colours[BitConverter.ToUInt32(p, 5)]; //0 is code, 1-4 is cooldown, 5 is colour, 9 is position
-                canvas.DrawRect(BitConverter.ToUInt32(p, 9) % 500, (float) Math.Floor(BitConverter.ToUInt32(p, 9) / 500f), 1, 1, c);
-            }
+            //Draw all pixels that have come in to the canvas.
+            foreach (var px in pixelsToDraw) canvas.DrawRect(px.X, px.Y, 1, 1, new SKPaint{ Color = px.Colour});
+            
 
             if (selectionBoard is not null && selectionCanvasCache is null)
             {
@@ -280,6 +272,12 @@ public partial class SkCanvas : UserControl
         stopwatch.Restart();
         return pixelAtColour;
     }
+
+    public void Set(Pixel pixel)
+    {
+        pixelsToDraw.Add(pixel);
+        Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
+    }
 }
 
 public struct Selection
@@ -287,3 +285,4 @@ public struct Selection
     public Point Tl;
     public Point Br;
 }
+public record Pixel(SKColor Colour, int X, int Y);

@@ -21,15 +21,17 @@ using rPlace.ViewModels;
 namespace rPlace.Views;
 public partial class MainWindow : Window
 {
-    public int? CurrentColour;
     private ClientWebSocket? ws;
     private bool mouseDown;
-    private Vector2 mouseLast = Vector2.Zero;
+    private Point mouseLast;
+    private Point mouseTravel;
     private Dictionary<string, Bitmap> cachedCanvasPreviews = new();
     private readonly HttpClient client = new();
     private static Vector2 lookingAtPixel;
     private readonly Cursor[] cursors = { new(StandardCursorType.Arrow), new(StandardCursorType.Cross) };
     private bool cacheCanvases;
+    
+    private PaletteViewModel PVM => (PaletteViewModel?) PaletteListBox.DataContext ?? new PaletteViewModel();
     
     private Vector2 LookingAtPixel
     {
@@ -139,9 +141,9 @@ public partial class MainWindow : Window
     
     private void OnBackgroundMouseDown(object? sender, PointerPressedEventArgs e)
     {
+        mouseTravel = new Point(0, 0);
         mouseDown = true;
         if (SelectTool.IsChecked is true) Board.StartSelection(new Point(lookingAtPixel.X, lookingAtPixel.Y), new Point(lookingAtPixel.X, lookingAtPixel.Y));
-        
     }
 
     private async void OnBackgroundMouseMove(object? sender, PointerEventArgs e)
@@ -160,7 +162,7 @@ public partial class MainWindow : Window
                 //If mouse if over board, then get pixel colour at that position.
                 var pxCol = Board.ColourAt((int)Math.Floor(e.GetPosition(CanvasBackground).X), (int)Math.Floor(e.GetPosition(CanvasBackground).Y));
                 if (pxCol is null) return;
-                //CurrentColour = PaletteViewModel.Colours.IndexOf((SKColor) pxCol);
+                if (PaletteViewModel.Colours.IndexOf((SKColor) pxCol) > 0) PVM.CurrentColour = PaletteViewModel.Colours.IndexOf((SKColor) pxCol);
                 CursorIndicatorRectangle.Background = new SolidColorBrush(new Color(pxCol.Value.Alpha, pxCol.Value.Red, pxCol.Value.Green, pxCol.Value.Blue));
                 return;
             }
@@ -182,16 +184,22 @@ public partial class MainWindow : Window
             Cursor = cursors[0];
             CursorIndicatorRectangle.IsVisible = false;
         }
-        mouseLast = new Vector2((float) e.GetPosition(CanvasBackground).X, (float) e.GetPosition(CanvasBackground).Y);
+        mouseTravel += new Point(Math.Abs(e.GetPosition(CanvasBackground).X - mouseLast.X), Math.Abs(e.GetPosition(CanvasBackground).Y - mouseLast.Y));
+        mouseLast = e.GetPosition(CanvasBackground);
     }
+    
     private void OnBackgroundMouseRelease(object? sender, PointerReleasedEventArgs e)
     {
         mouseDown = false;
-        
+
         //If we are not dragging, place pixel.
-        if (e.GetPosition(CanvasBackground).X - mouseLast.X < 10 || e.GetPosition(CanvasBackground).Y - mouseLast.Y < 10 || CurrentColour is null) return;
-        //(int) Math.Clamp(Math.Floor(e.GetPosition(canvasBackground).X - Board.Left), 0, 500)
-        //(int) Math.Clamp(Math.Floor(e.GetPosition(canvasBackground).Y - Board.Top), 0, 500)
+        if (mouseTravel.X > 5 || mouseTravel.Y > 5 || PVM.CurrentColour is null) return;
+        Board.Set(new Pixel(
+            PaletteViewModel.Colours[PVM.CurrentColour ?? 0],
+            (int) Math.Clamp(Math.Floor(e.GetPosition(CanvasBackground).X - Board.Left), 0, 500),
+            (int) Math.Clamp(Math.Floor(e.GetPosition(CanvasBackground).Y - Board.Top), 0, 500)
+        ));
+        mouseTravel = new Point(0, 0);
     }
     
     //https://github.com/rslashplace2/rslashplace2.github.io/blob/1cc30a12f35a6b0938e538100d3337228087d40d/index.html#L531
@@ -266,7 +274,7 @@ public partial class MainWindow : Window
 
     private void OnSelectColourClicked(object? _, RoutedEventArgs e) => Palette.IsVisible = true;
     private void OnPaletteDoneButtonClicked(object? _, RoutedEventArgs e) => Palette.IsVisible = false;
-    private void OnPaletteSelectionChanged(object? sender, SelectionChangedEventArgs e) => CurrentColour = (sender as ListBox)?.SelectedIndex ?? CurrentColour;
+    private void OnPaletteSelectionChanged(object? sender, SelectionChangedEventArgs e) =>  PVM.CurrentColour = (sender as ListBox)?.SelectedIndex ?? PVM.CurrentColour;
     
     private void OnResetCanvasViewPressed(object? _, PointerPressedEventArgs e)
     {

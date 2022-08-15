@@ -1,7 +1,6 @@
 ﻿using System;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.ReactiveUI;
 
 namespace rPlace
 {
@@ -18,9 +17,9 @@ namespace rPlace
         public static AppBuilder BuildAvaloniaApp()
             => AppBuilder.Configure<App>()
                 .UsePlatformDetect()
-                .LogToTrace()
-                .UseReactiveUI();
-        
+                .LogToTrace();
+                //.UseReactiveUI();
+
         //.With(new Win32PlatformOptions { AllowEglInitialization = true }) //Perf optimisations
         //.With(new X11PlatformOptions { UseGpu = true, UseEGL = true })
         //.With(new AvaloniaNativePlatformOptions { UseGpu = true })

@@ -2,12 +2,15 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using Avalonia.Media;
+using CommunityToolkit.Mvvm.ComponentModel;
 using SkiaSharp;
 
 namespace rPlace.ViewModels;
 
-public class PaletteViewModel : ViewModelBase
+public partial class PaletteViewModel : ObservableObject
 {
+    [ObservableProperty] private int? currentColour;
+    
     private ObservableCollection<IBrush> AvColours => new(Colours.Select(item => new SolidColorBrush(new Color(255, item.Red, item.Green, item.Blue))));
 
     public static readonly SKColor[] Colours =

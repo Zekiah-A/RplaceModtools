@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using ReactiveUI;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace rPlace.ViewModels
 {
-    public class ViewModelBase : ReactiveObject
+    public class ViewModelBase : ObservableObject
     {
     }
 }
