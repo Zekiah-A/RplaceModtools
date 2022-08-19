@@ -120,7 +120,7 @@
         </Border>
 
         <Panel Grid.Column="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="White" Opacity="0.8" x:Name="CanvasBackground">
-            <views:SkCanvas x:Name="Board" Bounds="0 0 500 500"/>
+            <views:SkCanvas x:Name="Board"/> <!--Bounds="0 0 500 500"-->
             
             <Canvas VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
                 <Border x:Name="CursorIndicatorRectangle" IsVisible="False" BorderBrush="Gray" CornerRadius="2" BorderThickness="1" Background="Transparent" Height="16" Width="16" Opacity="1"/>
@@ -197,7 +197,7 @@
                             <ToggleSwitch IsChecked="False" PropertyChanged="OnCacheCanvasChanged">Cache canvas previews</ToggleSwitch>
                             <ToggleSwitch>Dark mode</ToggleSwitch>
                             <TextBox Watermark="Backup check interval"></TextBox>
-                            <TextBlock PointerPressed="OnResetCanvasViewPressed">Reset canvas view</TextBlock>
+                            <TextBlock PointerPressed="OnResetCanvasViewPressed" >Reset canvas view</TextBlock>
                         </MenuItem>
                         <MenuItem Header="See application logs"/>
                         <MenuItem Header="Check for updates"/>

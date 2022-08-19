@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Numerics;
 using Avalonia;
 using Avalonia.Controls;
@@ -10,6 +11,7 @@ using Avalonia.Platform;
 using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
 using Avalonia.Threading;
+using rPlace.Models;
 using rPlace.ViewModels;
 using SkiaSharp;
 using Point = Avalonia.Point;
@@ -18,10 +20,13 @@ namespace rPlace.Views;
 
 public partial class SkCanvas : UserControl
 {
+    public int? CanvasWidth = 500;
+    public int? CanvasHeight = 750;
+    public Stack<Selection> Selections = new();
+    
     private static byte[]? board;
     private static char[]? changes;
     private static byte[]? selectionBoard;
-    private static Stack<Selection> selections = new();
     private static List<Pixel> pixelsToDraw = new();
     private static SKImage? canvasCache;
     private static SKImage? selectionCanvasCache;
@@ -30,7 +35,7 @@ public partial class SkCanvas : UserControl
     private static SKColor? pixelAtColour;
     private static Vector2? pixelAtPosition;
     private static Stopwatch? stopwatch;
-    
+
     public byte[]? Board
     {
         get => board;
@@ -104,9 +109,12 @@ public partial class SkCanvas : UserControl
 
     class CustomDrawOp : ICustomDrawOperation
     {
-        public CustomDrawOp(Rect bounds)
+        private SkCanvas ParentSk { get; }
+
+        public CustomDrawOp(Rect bounds, SkCanvas parentSk)
         {
             Bounds = bounds;
+            ParentSk = parentSk;
         }
         
         public void Dispose() { }
@@ -129,9 +137,9 @@ public partial class SkCanvas : UserControl
             //Equivalent of renderAll
             if (board is not null)
             {
-                using var img = new SKBitmap(500, 500, true);
+                using var img = new SKBitmap(ParentSk.CanvasWidth ?? 500, ParentSk.CanvasHeight ?? 500, true);
                 for (var i = 0; i < board.Length; i++)
-                    img.SetPixel(i % 500, i / 500, PaletteViewModel.Colours[board[i]]);
+                    img.SetPixel(i % ParentSk.CanvasWidth ?? 500, i / ParentSk.CanvasWidth ?? 500, PaletteViewModel.Colours[board[i]]);
                 canvasCache = SKImage.FromBitmap(img);
                 img.Dispose();
                 board = null;
@@ -152,18 +160,17 @@ public partial class SkCanvas : UserControl
             else canvas.DrawImage(canvasCache, 0, 0);
             
             //Draw all pixels that have come in to the canvas.
-            foreach (var px in pixelsToDraw) canvas.DrawRect(px.X, px.Y, 1, 1, new SKPaint{ Color = px.Colour});
-            
+            foreach (var (c, x, y) in pixelsToDraw) canvas.DrawRect(x, y, 1, 1, new SKPaint {Color = PaletteViewModel.Colours[c]});
 
             if (selectionBoard is not null && selectionCanvasCache is null)
             {
-                using var img = new SKBitmap(500, 500);
+                using var img = new SKBitmap(ParentSk.CanvasWidth ?? 500, ParentSk.CanvasHeight ?? 500);
                 for (var i = 0; i < selectionBoard.Length; i++)
                 {   //TODO: This method is not fully efficient and only attempting to draw at all within the selection bounds would be better.
-                    foreach (var sel in selections)
+                    foreach (var sel in ParentSk.Selections)
                     {   //Loop through the whole board, if pixel is within bounds of selection, draw, otherwise skip.
-                        if (i % 500 >= sel.Tl.X && i % 500 <= sel.Br.X && i / 500 >= sel.Tl.Y && i / 500 <= sel.Br.Y)//if (sel.Tl.X <= i % 500 && i % 500 <= sel.Br.X && i / 500f <= sel.Tl.Y && i / 500f <= sel.Br.Y)
-                            img.SetPixel(i % 500, i / 500, PaletteViewModel.Colours[selectionBoard[i]]);
+                        if (i % (ParentSk.CanvasWidth ?? 500) >= sel.Tl.X && i % (ParentSk.CanvasWidth ?? 500) <= sel.Br.X && i / (ParentSk.CanvasHeight ?? 500) >= sel.Tl.Y && i / (ParentSk.CanvasHeight ?? 500) <= sel.Br.Y)
+                            img.SetPixel(i % ParentSk.CanvasWidth ?? 500, i / ParentSk.CanvasHeight ?? 500, PaletteViewModel.Colours[selectionBoard[i]]);
                     }
                 }
                 selectionCanvasCache = SKImage.FromBitmap(img);
@@ -172,7 +179,7 @@ public partial class SkCanvas : UserControl
             if (selectionCanvasCache is not null) canvas.DrawImage(selectionCanvasCache, 0, 0);
             
             //Draw selections
-            foreach (var sel in selections)
+            foreach (var sel in ParentSk.Selections)
             {
                 var sKBrush = new SKPaint();
                 sKBrush.Color = new SKColor(100, 167, 255, 140);
@@ -204,7 +211,7 @@ public partial class SkCanvas : UserControl
     {
         base.Render(context);
         //TODO: Making a new instance of the CanvdDrawOp each time is really inefficient, but so far it is the only found way to force a redraw on the render thread.
-        using var canvDrawOp = new CustomDrawOp(new Rect(0, 0, Bounds.Width, Bounds.Height)); //Let's disable the global customdrawop for now until we fix above todo
+        using var canvDrawOp = new CustomDrawOp(new Rect(0, 0, Bounds.Width, Bounds.Height), this); //Let's disable the global customdrawop for now until we fix above todo
         context.Custom(canvDrawOp);
     }
 
@@ -241,23 +248,23 @@ public partial class SkCanvas : UserControl
             Tl = topLeft,
             Br = bottomRight
         };
-        selections.Push(sel);
+        Selections.Push(sel);
         Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
     }
 
     public void UpdateSelection(Point? topLeft = null, Point? bottomRight = null)
     {
-        var cur = selections.Pop();
+        var cur = Selections.Pop();
         cur.Tl = topLeft ?? cur.Tl;
         cur.Br = bottomRight ?? cur.Br;
-        selections.Push(cur);
+        Selections.Push(cur);
         selectionCanvasCache = null;
         Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
     }
 
     public void ClearSelections()
     {
-        selections = new Stack<Selection>();
+        Selections = new Stack<Selection>();
         selectionCanvasCache = null;
         Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
     }
@@ -285,4 +292,3 @@ public struct Selection
     public Point Tl;
     public Point Br;
 }
-public record Pixel(SKColor Colour, int X, int Y);

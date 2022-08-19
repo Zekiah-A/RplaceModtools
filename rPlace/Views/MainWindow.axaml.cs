@@ -2,42 +2,44 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using Avalonia.Controls;
 using Avalonia.Input;
-using System.Net.WebSockets;
-using System.Numerics;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using DynamicData;
+using rPlace.Models;
 using SkiaSharp;
 using rPlace.ViewModels;
+using WatsonWebsocket;
 
 namespace rPlace.Views;
 public partial class MainWindow : Window
 {
-    private ClientWebSocket? ws;
+    private WatsonWsClient socket;
     private bool mouseDown;
     private Point mouseLast;
     private Point mouseTravel;
+    private static Point lookingAtPixel;
     private Dictionary<string, Bitmap> cachedCanvasPreviews = new();
     private readonly HttpClient client = new();
-    private static Vector2 lookingAtPixel;
     private readonly Cursor[] cursors = { new(StandardCursorType.Arrow), new(StandardCursorType.Cross) };
     private bool cacheCanvases;
-    
+
     private PaletteViewModel PVM => (PaletteViewModel?) PaletteListBox.DataContext ?? new PaletteViewModel();
     
-    private Vector2 LookingAtPixel
+    private Point LookingAtPixel
     {
         get
         {   //Pixel we are looking at is 1/2screen width - board.left, to essentially get remainder
-            lookingAtPixel = new Vector2((float) Math.Clamp(Math.Floor(MainGrid.ColumnDefinitions[0].ActualWidth / 2 - Board.Left), 0, 500), (float) Math.Clamp(Math.Floor(Height / 2 - Board.Top), 0, 500));
+            lookingAtPixel = new Point(
+                Math.Clamp(Math.Floor(MainGrid.ColumnDefinitions[0].ActualWidth / 2 - Board.Left), 0, Board.CanvasWidth ?? 500),
+                Math.Clamp(Math.Floor(Height / 2 - Board.Top), 0, Board.CanvasHeight ?? 500)
+            );
             return lookingAtPixel;
         }
         set
@@ -47,6 +49,11 @@ public partial class MainWindow : Window
             Board.Top = (float) Math.Floor(Height / 2 - lookingAtPixel.Y);
         }
     }
+
+    private Point MouseOverPixel(PointerEventArgs e) => new(
+        (int) Math.Clamp(Math.Floor(e.GetPosition(CanvasBackground).X - Board.Left), 0, Board.CanvasWidth ?? 500),
+        (int) Math.Clamp(Math.Floor(e.GetPosition(CanvasBackground).Y - Board.Top), 0, Board.CanvasHeight ?? 500)
+    );
 
     public MainWindow()
     {
@@ -73,13 +80,61 @@ public partial class MainWindow : Window
     
     private async Task CreateConnection(Uri uri, string adminKey)
     {
-        ws = new ClientWebSocket();
-        await ws.ConnectAsync(new Uri(uri + adminKey), CancellationToken.None);
-        while (ws.State == WebSocketState.Open)
+        socket = new WatsonWsClient(new Uri(uri + adminKey));
+        
+        socket.ServerConnected += (sender, args) =>
         {
-            ArraySegment<byte> bytesReceived = new ArraySegment<byte>(new byte[1024]);
-            WebSocketReceiveResult result = await ws.ReceiveAsync(bytesReceived, CancellationToken.None);
-            Console.WriteLine(Encoding.UTF8.GetString(bytesReceived.Array!, 0, result.Count));
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("Connected to {0}", uri);
+            Console.ResetColor();
+        };
+        socket.MessageReceived += (sender, args) =>
+        {
+            //var stream = new MemoryStream(args.Data.ToArray()); var reader = new BinaryReader(stream); var c = reader.ReadByte();
+            var code = args.Data[0];
+            Console.WriteLine(code);
+            switch (code)
+            {
+                case 6: //Incoming pixel someone else sent
+                {
+                    var i = 0;
+                    while (i < args.Data.Count - 2)
+                    {
+                        var pos = BitConverter.ToUInt32(args.Data.ToArray(), i += 1);
+                        var col = args.Data[i += 4];
+                        Console.WriteLine("Incoming pixel {0}, {1}", pos, col);
+                    }
+                    break;
+                }
+                case 7: //Sending back what you placed
+                {
+                    var pos = BitConverter.ToUInt32(args.Data.ToArray(), 5);
+                    var col = args.Data[9];
+                    Console.WriteLine("Pixel coming back {0}, {1}", pos, col);
+                    break;
+                }
+                default: //We only consume packets that we essentially need, we can ignore everything else. 
+                    Console.WriteLine("Ignoring  {0}", code);
+                    break;
+            }
+        };
+        socket.ServerDisconnected += (sender, args) =>
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("Disconnected from websocket server");
+            Console.ResetColor();
+        };
+        
+        await socket.StartAsync();
+    }
+
+    private void OnRollbackButtonPressed()
+    {
+        //var buffer = new Uint8Array( w * h + 7 ), i = xxxx + yyyy * WIDTH
+        //Object.assign(buffer, [99, w, h, i >> 24, i >> 16, i >> 8, i])
+        foreach (var selection in Board.Selections)
+        {
+            var stream = new MemoryStream((int) (selection.Tl.X - selection.Br.X) * (int) (selection.Tl.Y - selection.Br.Y) + 7);
         }
     }
 
@@ -94,7 +149,7 @@ public partial class MainWindow : Window
 
         //Over time, this func will cache canvas previews as bitmaps so that we can load them faster when selected in the dropdown
         if (!cacheCanvases) return;
-        for (int i = 0; i < stack.Count; i++)
+        for (var i = 0; i < stack.Count; i++)
             cachedCanvasPreviews.Add((string) backupArr[i], await CreateCanvasPreviewImage(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backups", (string) backupArr[i])));
     }
     
@@ -113,15 +168,16 @@ public partial class MainWindow : Window
     private async Task<Bitmap> CreateCanvasPreviewImage(string? uri)
     {
         var placeFile = await (await Fetch(uri)).Content.ReadAsByteArrayAsync();
-        using var bmp = new SKBitmap(500, 500, true);
-        for (int i = 0; i < placeFile.Length; i++)
-            bmp.SetPixel(i % 500, i / 500, PaletteViewModel.Colours[placeFile[i]]);
+        using var bmp = new SKBitmap(Board.CanvasWidth ?? 500, Board.CanvasHeight ?? 500, true);
+        for (var i = 0; i < placeFile.Length; i++)
+            bmp.SetPixel(i % Board.CanvasWidth ?? 500, i / Board.CanvasWidth ?? 500, PaletteViewModel.Colours.ElementAtOrDefault(placeFile[i])); //ElementAtOrDefault is safer than direct index
         using var bitmap = bmp.Encode(SKEncodedImageFormat.Jpeg, 100);
         await using var imgStream = new MemoryStream();
         imgStream.Position = 0;
         bitmap.SaveTo(imgStream);
         imgStream.Seek(0, SeekOrigin.Begin);
-        bmp.Dispose(); bitmap.Dispose();
+        bmp.Dispose();
+        bitmap.Dispose();
         return new Bitmap(imgStream);
     }
 
@@ -130,31 +186,31 @@ public partial class MainWindow : Window
     {
         PlaceConfigPanel.IsVisible = false;
         await CreateConnection(new Uri(ConfigWsInput.Text), ConfigAdminKeyInput.Text);
-        PreviewImg.Source = await CreateCanvasPreviewImage(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "place"));
-        //Load the backup list into the dropdown, than start caching previews
+        
         await FetchCacheBackuplist();
         CanvasDropdown.SelectedIndex = 0;
-        
         //Set the most recent place file to be the board background
         Board.Board = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "place"))).Content.ReadAsByteArrayAsync();
     }
     
     private void OnBackgroundMouseDown(object? sender, PointerPressedEventArgs e)
     {
+        if (e.Source is null || !e.Source.Equals(CanvasBackground)) return; //stop bubbling
         mouseTravel = new Point(0, 0);
         mouseDown = true;
-        if (SelectTool.IsChecked is true) Board.StartSelection(new Point(lookingAtPixel.X, lookingAtPixel.Y), new Point(lookingAtPixel.X, lookingAtPixel.Y));
+        if (SelectTool.IsChecked is true) Board.StartSelection(MouseOverPixel(e), MouseOverPixel(e));
     }
 
     private async void OnBackgroundMouseMove(object? sender, PointerEventArgs e)
     {
+        if (e.Source is null || !e.Source.Equals(CanvasBackground)) return;
         if (mouseDown)
         {
             //If left mouse button, go to colour picker mode from the canvas instead
             if (e.GetCurrentPoint(this).Properties.IsMiddleButtonPressed)
             {
-                if (e.GetPosition(CanvasBackground).X - Board.Left < 0 || e.GetPosition(CanvasBackground).X - Board.Left > 500 * Board.Zoom ||
-                    e.GetPosition(CanvasBackground).Y - Board.Left < 0 || e.GetPosition(CanvasBackground).Y - Board.Left > 500 * Board.Zoom) return;
+                if (e.GetPosition(CanvasBackground).X - Board.Left < 0 || e.GetPosition(CanvasBackground).X - Board.Left > (Board.CanvasWidth ?? 500) * Board.Zoom ||
+                    e.GetPosition(CanvasBackground).Y - Board.Left < 0 || e.GetPosition(CanvasBackground).Y - Board.Left > (Board.CanvasHeight ?? 500) * Board.Zoom) return;
                 CursorIndicatorRectangle.IsVisible = true;
                 Canvas.SetLeft(CursorIndicatorRectangle, e.GetPosition(CanvasBackground).X + 8);
                 Canvas.SetTop(CursorIndicatorRectangle, e.GetPosition(CanvasBackground).Y + 8);
@@ -168,7 +224,17 @@ public partial class MainWindow : Window
             }
             if (SelectTool.IsChecked is true)
             {
-                Board.UpdateSelection(null, e.GetPosition(Board));
+                Board.UpdateSelection(null, MouseOverPixel(e));
+                return;
+            }
+            if (PVM.CurrentColour is not null) //drag place pixels
+            {
+                Board.Set(new Pixel(
+                    PVM.CurrentColour ?? 0,
+                    (int) Math.Floor(MouseOverPixel(e).X),
+                    (int) Math.Floor(MouseOverPixel(e).Y),
+                    Board.CanvasWidth ?? 500
+                ));
                 return;
             }
             
@@ -176,8 +242,8 @@ public partial class MainWindow : Window
             Board.Left += (float) (e.GetPosition(CanvasBackground).X - mouseLast.X) * (1 / Board.Zoom);
             Board.Top += (float) (e.GetPosition(CanvasBackground).Y - mouseLast.Y) * (1 / Board.Zoom);
             //Clamp values
-            Board.Left = (float) Math.Clamp(Board.Left, MainGrid.ColumnDefinitions[0].ActualWidth / 2 - 500 * Board.Zoom, MainGrid.ColumnDefinitions[0].ActualWidth / 2);
-            Board.Top = (float) Math.Clamp(Board.Top, Height / 2 - 500 * Board.Zoom, Height / 2);
+            Board.Left = (float) Math.Clamp(Board.Left, MainGrid.ColumnDefinitions[0].ActualWidth / 2 - (Board.CanvasWidth ?? 500) * Board.Zoom, MainGrid.ColumnDefinitions[0].ActualWidth / 2);
+            Board.Top = (float) Math.Clamp(Board.Top, Height / 2 - (Board.CanvasHeight ?? 500) * Board.Zoom, Height / 2);
         }
         else
         {
@@ -190,24 +256,28 @@ public partial class MainWindow : Window
     
     private void OnBackgroundMouseRelease(object? sender, PointerReleasedEventArgs e)
     {
+        if (e.Source is null || !e.Source.Equals(CanvasBackground)) return;
         mouseDown = false;
-
-        //If we are not dragging, place pixel.
-        if (mouseTravel.X > 5 || mouseTravel.Y > 5 || PVM.CurrentColour is null) return;
-        Board.Set(new Pixel(
-            PaletteViewModel.Colours[PVM.CurrentColour ?? 0],
-            (int) Math.Clamp(Math.Floor(e.GetPosition(CanvasBackground).X - Board.Left), 0, 500),
-            (int) Math.Clamp(Math.Floor(e.GetPosition(CanvasBackground).Y - Board.Top), 0, 500)
-        ));
-        mouseTravel = new Point(0, 0);
+        
+        //click place pixel
+        if (PVM.CurrentColour is null) return;
+        //if (socket.Connected) /*send it up that websocket baby*/
+        var px = new Pixel(
+            PVM.CurrentColour ?? 0,
+            (int) Math.Floor(MouseOverPixel(e).X),
+            (int) Math.Floor(MouseOverPixel(e).Y),
+            Board.CanvasWidth ?? 500
+        );
+        for (var oo = 0; oo < px.ToByteArray().Length; oo++) Console.Write(px.ToByteArray()[oo]);
+        Board.Set(px);
+        PVM.CurrentColour = null;
     }
     
     //https://github.com/rslashplace2/rslashplace2.github.io/blob/1cc30a12f35a6b0938e538100d3337228087d40d/index.html#L531
     private void OnBackgroundWheelChanged(object? sender, PointerWheelEventArgs e)
     {
-        //Board.Left -= (float) (e.GetPosition(this).X - MainGrid.ColumnDefinitions[0].ActualWidth / 2) / 50;
-        //Board.Top -= (float) (e.GetPosition(this).Y - Height / 2) / 50;
-        LookingAtPixel = new Vector2((float) (e.GetPosition(Board).X), (float) (e.GetPosition(Board).Y));
+        //Board.Left -= (float) (e.GetPosition(this).X - MainGrid.ColumnDefinitions[0].ActualWidth / 2) / 50; //Board.Top -= (float) (e.GetPosition(this).Y - Height / 2) / 50;
+        LookingAtPixel = new Point((float) (e.GetPosition(Board).X), (float) (e.GetPosition(Board).Y));
         Board.Zoom += (float) e.Delta.Y / 10;
     }
 
@@ -215,8 +285,9 @@ public partial class MainWindow : Window
     {
         if (CanvasDropdown is null) return;
         var backupName = CanvasDropdown.SelectedItem as string ?? "place";
-        PreviewImg.Source = cachedCanvasPreviews.ContainsKey(backupName) ? 
-            cachedCanvasPreviews[backupName] : await CreateCanvasPreviewImage(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backups", backupName));
+        PreviewImg.Source = cachedCanvasPreviews.ContainsKey(backupName)
+            ? cachedCanvasPreviews[backupName]
+            : await CreateCanvasPreviewImage(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backups", backupName));
         
         //If we are viewing selected date only through the selection, then we are still technically on the pseudo-live canvas, viewselected only applies when we are on the live canvas
         if (ViewSelectedDate.IsChecked is false)
