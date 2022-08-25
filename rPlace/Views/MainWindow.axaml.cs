@@ -1,9 +1,9 @@
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Net.WebSockets;
 using Avalonia.Controls;
 using Avalonia.Input;
 using System.Threading.Tasks;
@@ -15,27 +15,25 @@ using DynamicData;
 using rPlace.Models;
 using SkiaSharp;
 using rPlace.ViewModels;
-using WatsonWebsocket;
+using Websocket.Client;
 
 namespace rPlace.Views;
 public partial class MainWindow : Window
 {
-    private WatsonWsClient socket;
+    private WebsocketClient socket = null!;
     private bool mouseDown;
     private Point mouseLast;
     private Point mouseTravel;
     private static Point lookingAtPixel;
-    private Dictionary<string, Bitmap> cachedCanvasPreviews = new();
     private readonly HttpClient client = new();
     private readonly Cursor[] cursors = { new(StandardCursorType.Arrow), new(StandardCursorType.Cross) };
-    private bool cacheCanvases;
 
     private PaletteViewModel PVM => (PaletteViewModel?) PaletteListBox.DataContext ?? new PaletteViewModel();
     
     private Point LookingAtPixel
     {
         get
-        {   //Pixel we are looking at is 1/2screen width - board.left, to essentially get remainder
+        {
             lookingAtPixel = new Point(
                 Math.Clamp(Math.Floor(MainGrid.ColumnDefinitions[0].ActualWidth / 2 - Board.Left), 0, Board.CanvasWidth ?? 500),
                 Math.Clamp(Math.Floor(Height / 2 - Board.Top), 0, Board.CanvasHeight ?? 500)
@@ -78,54 +76,52 @@ public partial class MainWindow : Window
         });
     }
     
-    private async Task CreateConnection(Uri uri, string adminKey)
+    private async Task CreateConnection(string uri)
     {
-        socket = new WatsonWsClient(new Uri(uri + adminKey));
+        var factory = new Func<ClientWebSocket>(() =>
+        { 
+            var wsClient = new ClientWebSocket
+            {
+                Options = {KeepAliveInterval = TimeSpan.FromSeconds(5)}
+            };
+            wsClient.Options.SetRequestHeader("Origin", "https://rplace.tk");
+            return wsClient;
+        });
+        socket = new WebsocketClient(new Uri(uri), factory);
+        socket.ReconnectTimeout = TimeSpan.FromSeconds(10);
         
-        socket.ServerConnected += (sender, args) =>
+        socket.ReconnectionHappened.Subscribe(info => Console.WriteLine("Reconnected to {0}, {1}", uri, info.Type));
+        socket.MessageReceived.Subscribe(msg =>
         {
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("Connected to {0}", uri);
-            Console.ResetColor();
-        };
-        socket.MessageReceived += (sender, args) =>
-        {
-            //var stream = new MemoryStream(args.Data.ToArray()); var reader = new BinaryReader(stream); var c = reader.ReadByte();
-            var code = args.Data[0];
-            Console.WriteLine(code);
+            var code = msg.Binary[0];
             switch (code)
             {
                 case 6: //Incoming pixel someone else sent
                 {
+                    //if (BitConverter.IsLittleEndian) Array.Reverse(msg.Binary);
                     var i = 0;
-                    while (i < args.Data.Count - 2)
+                    foreach (var t in msg.Binary) Console.Write(t); Console.Write("\n");
+                    while (i < msg.Binary.Length - 2)
                     {
-                        var pos = BitConverter.ToUInt32(args.Data.ToArray(), i += 1);
-                        var col = args.Data[i += 4];
-                        Console.WriteLine("Incoming pixel {0}, {1}", pos, col);
+                        // //seti(data.getUint32(i += 1), data.getUint8(i += 4))
+                        var pos = BitConverter.ToInt32(msg.Binary, i += 1);
+                        var col = msg.Binary[i += 4];
+                        Console.WriteLine("c:{3} Incoming pixel {0}, {1}, {2}", pos % Board.CanvasWidth ?? 500, pos / Board.CanvasWidth ?? 500, col, code);
                     }
                     break;
                 }
                 case 7: //Sending back what you placed
                 {
-                    var pos = BitConverter.ToUInt32(args.Data.ToArray(), 5);
-                    var col = args.Data[9];
-                    Console.WriteLine("Pixel coming back {0}, {1}", pos, col);
+                    var pos = BitConverter.ToUInt32(msg.Binary.ToArray(), 5);
+                    var col = msg.Binary[9];
+                    Console.WriteLine("c:{3} Pixel coming back {0}, {1}, {2}", pos % Board.CanvasWidth ?? 500, pos / Board.CanvasWidth ?? 500, col, code);
                     break;
                 }
-                default: //We only consume packets that we essentially need, we can ignore everything else. 
-                    Console.WriteLine("Ignoring  {0}", code);
-                    break;
             }
-        };
-        socket.ServerDisconnected += (sender, args) =>
-        {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("Disconnected from websocket server");
-            Console.ResetColor();
-        };
+        });
+        socket.DisconnectionHappened.Subscribe(info => Console.WriteLine("Disconnected from {0}, {1}", uri, info.Exception));
         
-        await socket.StartAsync();
+        await socket.Start();
     }
 
     private void OnRollbackButtonPressed()
@@ -146,11 +142,6 @@ public partial class MainWindow : Window
         stack.Push("place");
         var backupArr = (object[]) stack.ToArray();
         CanvasDropdown.Items = backupArr;
-
-        //Over time, this func will cache canvas previews as bitmaps so that we can load them faster when selected in the dropdown
-        if (!cacheCanvases) return;
-        for (var i = 0; i < stack.Count; i++)
-            cachedCanvasPreviews.Add((string) backupArr[i], await CreateCanvasPreviewImage(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backups", (string) backupArr[i])));
     }
     
     private async Task<HttpResponseMessage> Fetch(string? uri)
@@ -165,9 +156,16 @@ public partial class MainWindow : Window
         return new HttpResponseMessage();
     }
 
-    private async Task<Bitmap> CreateCanvasPreviewImage(string? uri)
+    private async Task<Bitmap?> CreateCanvasPreviewImage<T>(T input)
     {
-        var placeFile = await (await Fetch(uri)).Content.ReadAsByteArrayAsync();
+        var placeFile = input switch
+        {
+            string uri => await (await Fetch(uri)).Content.ReadAsByteArrayAsync(),
+            byte[] board => board,
+            _ => null
+        };
+        if (placeFile is null) return null;
+        
         using var bmp = new SKBitmap(Board.CanvasWidth ?? 500, Board.CanvasHeight ?? 500, true);
         for (var i = 0; i < placeFile.Length; i++)
             bmp.SetPixel(i % Board.CanvasWidth ?? 500, i / Board.CanvasWidth ?? 500, PaletteViewModel.Colours.ElementAtOrDefault(placeFile[i])); //ElementAtOrDefault is safer than direct index
@@ -185,14 +183,15 @@ public partial class MainWindow : Window
     private async void OnStartButtonPressed(object? _, RoutedEventArgs e)
     {
         PlaceConfigPanel.IsVisible = false;
-        await CreateConnection(new Uri(ConfigWsInput.Text), ConfigAdminKeyInput.Text);
+        await CreateConnection(ConfigWsInput.Text + ConfigAdminKeyInput.Text);
         
         await FetchCacheBackuplist();
         CanvasDropdown.SelectedIndex = 0;
         //Set the most recent place file to be the board background
         Board.Board = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "place"))).Content.ReadAsByteArrayAsync();
+        DownloadBtn.IsEnabled = true;
     }
-    
+
     private void OnBackgroundMouseDown(object? sender, PointerPressedEventArgs e)
     {
         if (e.Source is null || !e.Source.Equals(CanvasBackground)) return; //stop bubbling
@@ -201,7 +200,7 @@ public partial class MainWindow : Window
         if (SelectTool.IsChecked is true) Board.StartSelection(MouseOverPixel(e), MouseOverPixel(e));
     }
 
-    private async void OnBackgroundMouseMove(object? sender, PointerEventArgs e)
+    private void OnBackgroundMouseMove(object? sender, PointerEventArgs e)
     {
         if (e.Source is null || !e.Source.Equals(CanvasBackground)) return;
         if (mouseDown)
@@ -229,12 +228,14 @@ public partial class MainWindow : Window
             }
             if (PVM.CurrentColour is not null) //drag place pixels
             {
-                Board.Set(new Pixel(
+                var px = new Pixel(
                     PVM.CurrentColour ?? 0,
                     (int) Math.Floor(MouseOverPixel(e).X),
                     (int) Math.Floor(MouseOverPixel(e).Y),
-                    Board.CanvasWidth ?? 500
-                ));
+                    Board.CanvasWidth ?? 500,
+                    Board.CanvasHeight ?? 500
+                );
+                Board.Set(px);
                 return;
             }
             
@@ -266,10 +267,14 @@ public partial class MainWindow : Window
             PVM.CurrentColour ?? 0,
             (int) Math.Floor(MouseOverPixel(e).X),
             (int) Math.Floor(MouseOverPixel(e).Y),
-            Board.CanvasWidth ?? 500
+            Board.CanvasWidth ?? 500,
+            Board.CanvasHeight ?? 500
         );
-        for (var oo = 0; oo < px.ToByteArray().Length; oo++) Console.Write(px.ToByteArray()[oo]);
+        //for (var oo = 0; oo < px.ToByteArray().Length; oo++) Console.Write(px.ToByteArray()[oo]);
         Board.Set(px);
+        socket.Send(px.ToByteArray());
+        socket.Send(px.ToByteArray());
+        for (var i = 0; i < px.ToByteArray().Length; i++) Console.Write(px.ToByteArray()[i]);
         PVM.CurrentColour = null;
     }
     
@@ -285,9 +290,7 @@ public partial class MainWindow : Window
     {
         if (CanvasDropdown is null) return;
         var backupName = CanvasDropdown.SelectedItem as string ?? "place";
-        PreviewImg.Source = cachedCanvasPreviews.ContainsKey(backupName)
-            ? cachedCanvasPreviews[backupName]
-            : await CreateCanvasPreviewImage(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backups", backupName));
+        PreviewImg.Source = await CreateCanvasPreviewImage(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backups", backupName));
         
         //If we are viewing selected date only through the selection, then we are still technically on the pseudo-live canvas, viewselected only applies when we are on the live canvas
         if (ViewSelectedDate.IsChecked is false)
@@ -313,7 +316,7 @@ public partial class MainWindow : Window
         }
     }
     
-    private async void OnViewSelectedDateChecked(object? _, RoutedEventArgs e)
+    private async void OnViewSelectedDateChecked(object? sender, RoutedEventArgs e)
     {
             Board.Board = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "place"))).Content.ReadAsByteArrayAsync();
             var backupName = CanvasDropdown.SelectedItem as string ?? "place";
@@ -325,7 +328,7 @@ public partial class MainWindow : Window
             SelectTool.IsEnabled = true;
     }
 
-    private async void OnViewSelectedDateUnchecked(object? _, RoutedEventArgs e)
+    private async void OnViewSelectedDateUnchecked(object? sender, RoutedEventArgs e)
     {
         Board.Board = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backups", (string) CanvasDropdown.SelectedItem!))).Content.ReadAsByteArrayAsync();
         //If we are not looking at most recent backup, show a warning that we will not be able to modify it at all & disable tools.
@@ -335,22 +338,35 @@ public partial class MainWindow : Window
         RubberTool.IsEnabled = CanvasDropdown.SelectedIndex == 0;
         SelectTool.IsEnabled = CanvasDropdown.SelectedIndex == 0;
     }
-
-    private async void OnCacheCanvasChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
-    {
-        if (sender is null) return;
-        cacheCanvases = (bool) ((ToggleSwitch) sender).IsChecked!;
-        if (cacheCanvases) await FetchCacheBackuplist();
-    }
-
-    private void OnSelectColourClicked(object? _, RoutedEventArgs e) => Palette.IsVisible = true;
-    private void OnPaletteDoneButtonClicked(object? _, RoutedEventArgs e) => Palette.IsVisible = false;
-    private void OnPaletteSelectionChanged(object? sender, SelectionChangedEventArgs e) =>  PVM.CurrentColour = (sender as ListBox)?.SelectedIndex ?? PVM.CurrentColour;
     
-    private void OnResetCanvasViewPressed(object? _, PointerPressedEventArgs e)
+    private void OnResetCanvasViewPressed(object? _, RoutedEventArgs e)
     {
         Board.Left = 0;
         Board.Top = 0;
         Board.Zoom = 1;
+    }
+    
+    private void OnSelectColourClicked(object? sender, RoutedEventArgs e) => Palette.IsVisible = true;
+    private void OnPaletteDoneButtonClicked(object? sender, RoutedEventArgs e) => Palette.IsVisible = false;
+    private void OnPaletteSelectionChanged(object? sender, SelectionChangedEventArgs e) =>  PVM.CurrentColour = (sender as ListBox)?.SelectedIndex ?? PVM.CurrentColour;
+    private async void OnDownloadPreviewPressed(object? sender, RoutedEventArgs e)
+    {
+        var path = await ShowSaveFileDialog(
+            (CanvasDropdown.SelectedItem as string ?? "place") + "_preview.jpg",
+            "Download place file image to system"
+        );
+        if (path is null) return;
+        var placeImg = await CreateCanvasPreviewImage(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backups", CanvasDropdown.SelectedItem as string ?? "place"));
+        placeImg?.Save(path);
+    } 
+
+    private async Task<string?> ShowSaveFileDialog(string fileName, string title)
+    {
+        var dialog = new SaveFileDialog
+        {
+            InitialFileName = fileName,
+            Title = title
+        };
+        return await dialog.ShowAsync(this);
     }
 }

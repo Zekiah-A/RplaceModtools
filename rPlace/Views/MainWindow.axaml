@@ -172,7 +172,7 @@
                     </ComboBox>
                     <Panel>
                         <Image x:Name="PreviewImg" Margin="5" Source="../Assets/preview_default.png" RenderOptions.BitmapInterpolationMode="Default"/>
-                        <Button HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="5" Background="{StaticResource SystemAltLowColor}">Download</Button>
+                        <Button x:Name="DownloadBtn" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="5" Background="{StaticResource SystemAltLowColor}" Click="OnDownloadPreviewPressed">Download</Button>
                     </Panel>
                     <TextBlock FontSize="18">Tool modes:</TextBlock>
                     <Grid Margin="5" RowDefinitions="*, *" ColumnDefinitions="*, *">
@@ -194,10 +194,10 @@
                 <Button.Flyout>
                     <MenuFlyout Placement="Bottom">
                         <MenuItem Header="Settings">
-                            <ToggleSwitch IsChecked="False" PropertyChanged="OnCacheCanvasChanged">Cache canvas previews</ToggleSwitch>
-                            <ToggleSwitch>Dark mode</ToggleSwitch>
-                            <TextBox Watermark="Backup check interval"></TextBox>
-                            <TextBlock PointerPressed="OnResetCanvasViewPressed" >Reset canvas view</TextBlock>
+                            <MenuItem>Enable cache place files</MenuItem>
+                            <MenuItem>Enable dark mode</MenuItem>
+                            <MenuItem>Toggle backup check interval</MenuItem>
+                            <MenuItem Click="OnResetCanvasViewPressed">Reset canvas view</MenuItem>
                         </MenuItem>
                         <MenuItem Header="See application logs"/>
                         <MenuItem Header="Check for updates"/>

@@ -1,7 +1,9 @@
+using System;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Grpc.Core.Logging;
 using rPlace.ViewModels;
 using rPlace.Views;
 
@@ -9,7 +11,7 @@ namespace rPlace
 {
     public partial class App : Application
     {
-      
+
         public override void Initialize()
         {
             AvaloniaXamlLoader.Load(this);

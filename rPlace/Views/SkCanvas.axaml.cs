@@ -27,7 +27,7 @@ public partial class SkCanvas : UserControl
     private static byte[]? board;
     private static char[]? changes;
     private static byte[]? selectionBoard;
-    private static List<Pixel> pixelsToDraw = new();
+    private static byte[]? pixelsToDraw;
     private static SKImage? canvasCache;
     private static SKImage? selectionCanvasCache;
     private static float canvZoom = 1;
@@ -160,8 +160,15 @@ public partial class SkCanvas : UserControl
             else canvas.DrawImage(canvasCache, 0, 0);
             
             //Draw all pixels that have come in to the canvas.
-            foreach (var (c, x, y) in pixelsToDraw) canvas.DrawRect(x, y, 1, 1, new SKPaint {Color = PaletteViewModel.Colours[c]});
-
+            if (pixelsToDraw is not null)
+            {
+                for (var c = 0; c < pixelsToDraw.Length; c++)
+                {
+                    if (pixelsToDraw[c] == 255) continue;
+                    canvas.DrawRect(c % ParentSk.CanvasWidth ?? 500, c / ParentSk.CanvasWidth ?? 500, 1, 1, new SKPaint { Color = PaletteViewModel.Colours[(byte) pixelsToDraw[c]] });
+                }
+            }
+            
             if (selectionBoard is not null && selectionCanvasCache is null)
             {
                 using var img = new SKBitmap(ParentSk.CanvasWidth ?? 500, ParentSk.CanvasHeight ?? 500);
@@ -282,9 +289,22 @@ public partial class SkCanvas : UserControl
 
     public void Set(Pixel pixel)
     {
-        pixelsToDraw.Add(pixel);
+        if (pixelsToDraw is null)
+        {
+            pixelsToDraw = new byte[(CanvasWidth ?? 500) * (CanvasHeight ?? 500)];
+            Array.Fill(pixelsToDraw, (byte) 255);
+        }
+        pixelsToDraw[pixel.Index] = (byte) pixel.Colour;
         Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
     }
+    
+    public void Unset(int x, int y)
+    {
+        if (pixelsToDraw is null) return;
+        pixelsToDraw[(x % CanvasWidth ?? 500) + (y % CanvasHeight ?? 500) * CanvasWidth ?? 500] = 255;
+        Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
+    }
+
 }
 
 public struct Selection
