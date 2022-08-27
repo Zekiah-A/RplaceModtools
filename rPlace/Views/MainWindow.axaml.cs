@@ -1,16 +1,12 @@
-using System;
 using System.Collections;
-using System.IO;
-using System.Linq;
-using System.Net.Http;
 using System.Net.WebSockets;
 using Avalonia.Controls;
 using Avalonia.Input;
-using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Themes.Fluent;
 using DynamicData;
 using rPlace.Models;
 using SkiaSharp;
@@ -20,14 +16,15 @@ using Websocket.Client;
 namespace rPlace.Views;
 public partial class MainWindow : Window
 {
-    private WebsocketClient socket = null!;
     private bool mouseDown;
     private Point mouseLast;
     private Point mouseTravel;
-    private static Point lookingAtPixel;
+    private Point lookingAtPixel;
+    private WebsocketClient socket;
     private readonly HttpClient client = new();
-    private readonly Cursor[] cursors = { new(StandardCursorType.Arrow), new(StandardCursorType.Cross) };
-
+    private readonly Cursor arrow = new (StandardCursorType.Arrow);
+    private readonly Cursor cross = new(StandardCursorType.Cross);
+    
     private PaletteViewModel PVM => (PaletteViewModel?) PaletteListBox.DataContext ?? new PaletteViewModel();
     
     private Point LookingAtPixel
@@ -82,7 +79,7 @@ public partial class MainWindow : Window
         { 
             var wsClient = new ClientWebSocket
             {
-                Options = {KeepAliveInterval = TimeSpan.FromSeconds(5)}
+                Options = { KeepAliveInterval = TimeSpan.FromSeconds(5) }
             };
             wsClient.Options.SetRequestHeader("Origin", "https://rplace.tk");
             return wsClient;
@@ -128,10 +125,10 @@ public partial class MainWindow : Window
     {
         //var buffer = new Uint8Array( w * h + 7 ), i = xxxx + yyyy * WIDTH
         //Object.assign(buffer, [99, w, h, i >> 24, i >> 16, i >> 8, i])
-        foreach (var selection in Board.Selections)
-        {
-            var stream = new MemoryStream((int) (selection.Tl.X - selection.Br.X) * (int) (selection.Tl.Y - selection.Br.Y) + 7);
-        }
+        //foreach (var selection in Board.Selections)
+        //{
+        //    var stream = new MemoryStream((int) (selection.Tl.X - selection.Br.X) * (int) (selection.Tl.Y - selection.Br.Y) + 7);
+        //}
     }
 
     private async Task FetchCacheBackuplist()
@@ -169,7 +166,7 @@ public partial class MainWindow : Window
         using var bmp = new SKBitmap(Board.CanvasWidth ?? 500, Board.CanvasHeight ?? 500, true);
         for (var i = 0; i < placeFile.Length; i++)
             bmp.SetPixel(i % Board.CanvasWidth ?? 500, i / Board.CanvasWidth ?? 500, PaletteViewModel.Colours.ElementAtOrDefault(placeFile[i])); //ElementAtOrDefault is safer than direct index
-        using var bitmap = bmp.Encode(SKEncodedImageFormat.Jpeg, 100);
+        using var bitmap = bmp.Encode(SKEncodedImageFormat.Png, 100);
         await using var imgStream = new MemoryStream();
         imgStream.Position = 0;
         bitmap.SaveTo(imgStream);
@@ -180,16 +177,16 @@ public partial class MainWindow : Window
     }
 
     //App started
-    private async void OnStartButtonPressed(object? _, RoutedEventArgs e)
+    private async void OnStartButtonPressed(object? sender, RoutedEventArgs e)
     {
         PlaceConfigPanel.IsVisible = false;
+        DownloadBtn.IsEnabled = true;
         await CreateConnection(ConfigWsInput.Text + ConfigAdminKeyInput.Text);
-        
         await FetchCacheBackuplist();
         CanvasDropdown.SelectedIndex = 0;
         //Set the most recent place file to be the board background
         Board.Board = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "place"))).Content.ReadAsByteArrayAsync();
-        DownloadBtn.IsEnabled = true;
+        
     }
 
     private void OnBackgroundMouseDown(object? sender, PointerPressedEventArgs e)
@@ -213,7 +210,7 @@ public partial class MainWindow : Window
                 CursorIndicatorRectangle.IsVisible = true;
                 Canvas.SetLeft(CursorIndicatorRectangle, e.GetPosition(CanvasBackground).X + 8);
                 Canvas.SetTop(CursorIndicatorRectangle, e.GetPosition(CanvasBackground).Y + 8);
-                Cursor = cursors[1];
+                Cursor = cross;
                 //If mouse if over board, then get pixel colour at that position.
                 var pxCol = Board.ColourAt((int)Math.Floor(e.GetPosition(CanvasBackground).X), (int)Math.Floor(e.GetPosition(CanvasBackground).Y));
                 if (pxCol is null) return;
@@ -228,14 +225,15 @@ public partial class MainWindow : Window
             }
             if (PVM.CurrentColour is not null) //drag place pixels
             {
-                var px = new Pixel(
-                    PVM.CurrentColour ?? 0,
-                    (int) Math.Floor(MouseOverPixel(e).X),
-                    (int) Math.Floor(MouseOverPixel(e).Y),
-                    Board.CanvasWidth ?? 500,
-                    Board.CanvasHeight ?? 500
-                );
-                Board.Set(px);
+                var px = new Pixel {
+                    Colour = PVM.CurrentColour ?? 0,
+                    X = (int) Math.Floor(MouseOverPixel(e).X),
+                    Y = (int) Math.Floor(MouseOverPixel(e).Y),
+                    Width = Board.CanvasWidth ?? 500,
+                    Height = Board.CanvasHeight ?? 500
+                };
+                //Board.Set(px);
+                //SetPixels(px, 20);
                 return;
             }
             
@@ -248,7 +246,7 @@ public partial class MainWindow : Window
         }
         else
         {
-            Cursor = cursors[0];
+            Cursor = arrow;
             CursorIndicatorRectangle.IsVisible = false;
         }
         mouseTravel += new Point(Math.Abs(e.GetPosition(CanvasBackground).X - mouseLast.X), Math.Abs(e.GetPosition(CanvasBackground).Y - mouseLast.Y));
@@ -262,22 +260,19 @@ public partial class MainWindow : Window
         
         //click place pixel
         if (PVM.CurrentColour is null) return;
-        //if (socket.Connected) /*send it up that websocket baby*/
-        var px = new Pixel(
-            PVM.CurrentColour ?? 0,
-            (int) Math.Floor(MouseOverPixel(e).X),
-            (int) Math.Floor(MouseOverPixel(e).Y),
-            Board.CanvasWidth ?? 500,
-            Board.CanvasHeight ?? 500
-        );
-        //for (var oo = 0; oo < px.ToByteArray().Length; oo++) Console.Write(px.ToByteArray()[oo]);
-        Board.Set(px);
-        socket.Send(px.ToByteArray());
-        socket.Send(px.ToByteArray());
+        var px = new Pixel {
+            Colour = PVM.CurrentColour ?? 0,
+            X = (int) Math.Floor(MouseOverPixel(e).X),
+            Y = (int) Math.Floor(MouseOverPixel(e).Y),
+            Width = Board.CanvasWidth ?? 500,
+            Height = Board.CanvasHeight ?? 500
+        };
+        //SetPixels(px, 50);
+        //Board.Set(px);
         for (var i = 0; i < px.ToByteArray().Length; i++) Console.Write(px.ToByteArray()[i]);
         PVM.CurrentColour = null;
     }
-    
+
     //https://github.com/rslashplace2/rslashplace2.github.io/blob/1cc30a12f35a6b0938e538100d3337228087d40d/index.html#L531
     private void OnBackgroundWheelChanged(object? sender, PointerWheelEventArgs e)
     {
@@ -352,7 +347,7 @@ public partial class MainWindow : Window
     private async void OnDownloadPreviewPressed(object? sender, RoutedEventArgs e)
     {
         var path = await ShowSaveFileDialog(
-            (CanvasDropdown.SelectedItem as string ?? "place") + "_preview.jpg",
+            (CanvasDropdown.SelectedItem as string ?? "place") + "_preview.png",
             "Download place file image to system"
         );
         if (path is null) return;
@@ -368,5 +363,33 @@ public partial class MainWindow : Window
             Title = title
         };
         return await dialog.ShowAsync(this);
+    }
+    
+    private void SetPixels(Pixel px, int radius)
+    {
+        if (radius is 0 or 1)
+        {
+            Board.Set(px);
+            //socket.Send(px.ToByteArray());
+            return;
+        }
+        
+        for (var x = 0 - radius / 2; x < radius / 2; x++)
+        {
+            for (var y = 0 - radius / 2; y < radius / 2; y++)
+            {
+                var radiusPx = px.Clone();
+                radiusPx.X += x;
+                radiusPx.Y += y;
+                Board.Set(radiusPx);
+                //socket.Send(px.ToByteArray());
+            }
+        }
+    }
+
+    private void OnToggleThemePressed(object? sender, RoutedEventArgs e)
+    {
+        var currentStyle = (FluentTheme) Application.Current?.Styles[4]!;
+        currentStyle.Mode = currentStyle.Mode == FluentThemeMode.Dark ? FluentThemeMode.Light : FluentThemeMode.Dark;
     }
 }

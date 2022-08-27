@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using Avalonia.Media;
-using Avalonia.Media.Imaging;
-using CommunityToolkit.Mvvm.ComponentModel;
-using SkiaSharp;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace rPlace.ViewModels;
 public partial class MainWindowViewModel : ObservableObject

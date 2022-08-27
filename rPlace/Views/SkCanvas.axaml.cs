@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Numerics;
 using Avalonia;
 using Avalonia.Controls;
@@ -14,7 +11,6 @@ using Avalonia.Threading;
 using rPlace.Models;
 using rPlace.ViewModels;
 using SkiaSharp;
-using Point = Avalonia.Point;
 
 namespace rPlace.Views;
 
@@ -35,6 +31,7 @@ public partial class SkCanvas : UserControl
     private static SKColor? pixelAtColour;
     private static Vector2? pixelAtPosition;
     private static Stopwatch? stopwatch;
+    private static List<SKPaint> paints = new();
 
     public byte[]? Board
     {
@@ -94,12 +91,12 @@ public partial class SkCanvas : UserControl
             Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
         }
     }
-    
+
     public SkCanvas()
     {
         InitializeComponent();
         ClipToBounds = true;
-        //canvDrawOp = new CustomDrawOp(new Rect(0, 0, Bounds.Width, Bounds.Height));
+        foreach (var col in PaletteViewModel.Colours) paints.Add(new SKPaint { Color = col });
     }
 
     private void InitializeComponent()
@@ -165,7 +162,7 @@ public partial class SkCanvas : UserControl
                 for (var c = 0; c < pixelsToDraw.Length; c++)
                 {
                     if (pixelsToDraw[c] == 255) continue;
-                    canvas.DrawRect(c % ParentSk.CanvasWidth ?? 500, c / ParentSk.CanvasWidth ?? 500, 1, 1, new SKPaint { Color = PaletteViewModel.Colours[(byte) pixelsToDraw[c]] });
+                    canvas.DrawRect(c % ParentSk.CanvasWidth ?? 500, c / ParentSk.CanvasWidth ?? 500, 1, 1, paints[pixelsToDraw[c]]);
                 }
             }
             

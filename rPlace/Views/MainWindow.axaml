@@ -127,15 +127,22 @@
             </Canvas>
             
             <Border x:Name="ToolsInformation" IsVisible="False" Width="256" VerticalAlignment="Top" HorizontalAlignment="Right" BorderThickness="2" CornerRadius="8" Margin="16" Padding="8">
-                <Border.Background><SolidColorBrush Color="Gray" Opacity="0.5" /></Border.Background>
+                <Border.Background>
+                    <SolidColorBrush Color="Gray" Opacity="0.5" />
+                </Border.Background>
                 <TextBlock x:Name="LiveCanvasWarning" IsVisible="False" Foreground="Yellow" TextWrapping="Wrap">⚠️ Warning: You are not on the live canvas, therefore any edits will not be applied.</TextBlock>
+                <!--<ContentControl>
+                    <ContentControl.ContentTemplate>
+                        
+                    </ContentControl.ContentTemplate>
+                </ContentControl>-->
             </Border>
             
             <Button ZIndex="3" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="10" Padding="10" Click="OnSelectColourClicked">Select Colour</Button>
             <DockPanel ZIndex="8" Dock="Bottom" Height="150" VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Background="White" IsVisible="False" x:Name="Palette">
                 <Grid RowDefinitions="* Auto">
                     <ScrollViewer Grid.Row="0">
-                        <ListBox x:Name="PaletteListBox" Items="{Binding AvColours}" HorizontalAlignment="Stretch" VerticalAlignment="Top" SelectionChanged="OnPaletteSelectionChanged" SelectedIndex="{Binding CurrentColour}">
+                        <ListBox x:Name="PaletteListBox" Items="{Binding AvColours}" HorizontalAlignment="Stretch" VerticalAlignment="Top" SelectionChanged="OnPaletteSelectionChanged" SelectedIndex="{Binding CurrentColour}" Background="Transparent">
                             <ListBox.DataContext><vm:PaletteViewModel/></ListBox.DataContext>
                             <ListBox.Styles>
                                 <Style Selector="ListBoxItem">
@@ -144,7 +151,9 @@
                             </ListBox.Styles>
                             <ListBox.ItemsPanel>
                                 <ItemsPanelTemplate> 
-                                    <WrapPanel x:Name="PalettePanel" Orientation="Horizontal" Margin="10 16 10 0"/>
+                                    <WrapPanel x:Name="PalettePanel" Orientation="Horizontal" Margin="10 16 10 0">
+                                        <views:SkBlur></views:SkBlur>
+                                    </WrapPanel>
                                 </ItemsPanelTemplate>
                             </ListBox.ItemsPanel>
                             <ListBox.ItemTemplate>
@@ -172,7 +181,7 @@
                     </ComboBox>
                     <Panel>
                         <Image x:Name="PreviewImg" Margin="5" Source="../Assets/preview_default.png" RenderOptions.BitmapInterpolationMode="Default"/>
-                        <Button x:Name="DownloadBtn" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="5" Background="{StaticResource SystemAltLowColor}" Click="OnDownloadPreviewPressed">Download</Button>
+                        <Button x:Name="DownloadBtn" IsEnabled="False" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="5" Background="{StaticResource SystemAltLowColor}" Click="OnDownloadPreviewPressed">Download</Button>
                     </Panel>
                     <TextBlock FontSize="18">Tool modes:</TextBlock>
                     <Grid Margin="5" RowDefinitions="*, *" ColumnDefinitions="*, *">
@@ -194,10 +203,10 @@
                 <Button.Flyout>
                     <MenuFlyout Placement="Bottom">
                         <MenuItem Header="Settings">
-                            <MenuItem>Enable cache place files</MenuItem>
-                            <MenuItem>Enable dark mode</MenuItem>
-                            <MenuItem>Toggle backup check interval</MenuItem>
-                            <MenuItem Click="OnResetCanvasViewPressed">Reset canvas view</MenuItem>
+                            <MenuItem Header="Enable cache place files"/>
+                            <MenuItem Header="Toggle dark mode" Click="OnToggleThemePressed"/>
+                            <MenuItem Header="Toggle backup check interval"/>
+                            <MenuItem Header="Reset canvas view" Click="OnResetCanvasViewPressed"/>
                         </MenuItem>
                         <MenuItem Header="See application logs"/>
                         <MenuItem Header="Check for updates"/>
