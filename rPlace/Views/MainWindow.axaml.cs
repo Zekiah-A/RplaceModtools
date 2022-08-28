@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Diagnostics;
 using System.Net.WebSockets;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -46,8 +47,8 @@ public partial class MainWindow : Window
     }
 
     private Point MouseOverPixel(PointerEventArgs e) => new(
-        (int) Math.Clamp(Math.Floor(e.GetPosition(CanvasBackground).X - Board.Left), 0, Board.CanvasWidth ?? 500),
-        (int) Math.Clamp(Math.Floor(e.GetPosition(CanvasBackground).Y - Board.Top), 0, Board.CanvasHeight ?? 500)
+        (int) Math.Clamp(Math.Floor((e.GetPosition(CanvasBackground).X - Board.Left) * (1 / Board.Zoom)), 0, Board.CanvasWidth ?? 500),
+        (int) Math.Clamp(Math.Floor((e.GetPosition(CanvasBackground).Y - Board.Top) * (1 / Board.Zoom)), 0, Board.CanvasHeight ?? 500)
     );
 
     public MainWindow()
@@ -178,15 +179,17 @@ public partial class MainWindow : Window
 
     //App started
     private async void OnStartButtonPressed(object? sender, RoutedEventArgs e)
-    {
+    {        
+        //UI and connections
+        await CreateConnection(ConfigWsInput.Text + ConfigAdminKeyInput.Text);
+        Board.Board = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "place"))).Content.ReadAsByteArrayAsync();
         PlaceConfigPanel.IsVisible = false;
         DownloadBtn.IsEnabled = true;
-        await CreateConnection(ConfigWsInput.Text + ConfigAdminKeyInput.Text);
+
+        //Backup loading
         await FetchCacheBackuplist();
         CanvasDropdown.SelectedIndex = 0;
-        //Set the most recent place file to be the board background
-        Board.Board = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "place"))).Content.ReadAsByteArrayAsync();
-        
+        //BackupCheckInterval();
     }
 
     private void OnBackgroundMouseDown(object? sender, PointerPressedEventArgs e)
@@ -232,7 +235,8 @@ public partial class MainWindow : Window
                     Width = Board.CanvasWidth ?? 500,
                     Height = Board.CanvasHeight ?? 500
                 };
-                //Board.Set(px);
+                Board.Set(px);
+                if (socket.IsRunning) socket.Send(px.ToByteArray());
                 //SetPixels(px, 20);
                 return;
             }
@@ -260,7 +264,8 @@ public partial class MainWindow : Window
         
         //click place pixel
         if (PVM.CurrentColour is null) return;
-        var px = new Pixel {
+        var px = new Pixel
+        {
             Colour = PVM.CurrentColour ?? 0,
             X = (int) Math.Floor(MouseOverPixel(e).X),
             Y = (int) Math.Floor(MouseOverPixel(e).Y),
@@ -268,8 +273,9 @@ public partial class MainWindow : Window
             Height = Board.CanvasHeight ?? 500
         };
         //SetPixels(px, 50);
-        //Board.Set(px);
-        for (var i = 0; i < px.ToByteArray().Length; i++) Console.Write(px.ToByteArray()[i]);
+        Board.Set(px);
+        if (socket.IsRunning) socket.Send(px.ToByteArray());
+
         PVM.CurrentColour = null;
     }
 
@@ -370,7 +376,7 @@ public partial class MainWindow : Window
         if (radius is 0 or 1)
         {
             Board.Set(px);
-            //socket.Send(px.ToByteArray());
+            socket.Send(px.ToByteArray());
             return;
         }
         
@@ -382,14 +388,51 @@ public partial class MainWindow : Window
                 radiusPx.X += x;
                 radiusPx.Y += y;
                 Board.Set(radiusPx);
-                //socket.Send(px.ToByteArray());
+                socket.Send(px.ToByteArray());
             }
         }
     }
 
     private void OnToggleThemePressed(object? sender, RoutedEventArgs e)
     {
-        var currentStyle = (FluentTheme) Application.Current?.Styles[4]!;
+        var currentStyle = (FluentTheme) Application.Current?.Styles[0]!;
         currentStyle.Mode = currentStyle.Mode == FluentThemeMode.Dark ? FluentThemeMode.Light : FluentThemeMode.Dark;
+    }
+
+    private void OnOpenGithubClicked(object? sender, RoutedEventArgs e)
+    {
+        string? processName = null;
+        if (OperatingSystem.IsLinux() || OperatingSystem.IsFreeBSD())
+            processName = "xdg-open";
+        else if (OperatingSystem.IsWindows())
+            processName = "";
+        else if (OperatingSystem.IsMacOS())
+            processName = "open";
+        if (processName is null) return;
+        using var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = processName,
+                Arguments = "https://github.com/Zekiah-A/rplace-modtools"
+            }
+        };
+        process.Start();
+    }
+
+    private async Task BackupCheckInterval()
+    {
+
+        //Wait 15 mins before checking again, TODO: Make this configurable with toggle backup check interval
+        while (true)
+        {
+            Thread.Sleep(900000);
+            await FetchCacheBackuplist();
+            //If we are already viewing place update it
+            if (CanvasDropdown.SelectedIndex == 0)
+            {
+                Board.Board = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "place"))).Content.ReadAsByteArrayAsync();
+            }
+        }
     }
 }
