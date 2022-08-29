@@ -18,7 +18,7 @@
             <Style.Animations>
                 <Animation Delay="0:0:1" Duration="0:0:1" Easing="QuadraticEaseOut"> 
                     <KeyFrame Cue="0%">
-                        <Setter Property="Height" Value="150"></Setter>
+                        <Setter Property="Height" Value="140"></Setter>
                         <Setter Property="Opacity" Value="0.0"/>
                     </KeyFrame>
                     <KeyFrame Cue="100%">
@@ -56,6 +56,21 @@
                     </KeyFrame>
                 </Animation>
             </Style.Animations>
+        </Style>
+        <Style Selector="Button.ServerPresetButton">
+            <Style.Animations>
+                <Animation Delay="0:0:3" Duration="0:0:2" Easing="QuadraticEaseOut"> 
+                    <KeyFrame Cue="0%">
+                        <Setter Property="Opacity" Value="0.0"/>
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="Opacity" Value="1.0"/>
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+            <Setter Property="MinWidth" Value="72"/>
+            <Setter Property="MinHeight" Value="72"/>
+            <Setter Property="Margin" Value="2"/>
         </Style>
         <!-- TODO: Should use transition instead -->
         <Style Selector="Border.ToolsPanelOpen">
@@ -102,7 +117,7 @@
     </Design.DataContext>
     
     <Grid ColumnDefinitions="*, Auto" x:Name="MainGrid">
-        <Border Grid.Column="0" Grid.ColumnSpan="2" x:Name="PlaceConfigPanel" HorizontalAlignment="Center" VerticalAlignment="Center" Width="380" Height="500" Background="White" BoxShadow="0 0 20 2 Gray" CornerRadius="10" ZIndex="8">
+        <Border Grid.Column="0" Grid.ColumnSpan="2" x:Name="PlaceConfigPanel" HorizontalAlignment="Center" VerticalAlignment="Center" Width="380" Height="508" Background="White" BoxShadow="0 0 20 2 Gray" CornerRadius="10" ZIndex="8">
             <Grid RowDefinitions="*, Auto">
                 <StackPanel Grid.Row="0">
                     <Image Classes="PlaceLogo" Source="../Assets/favicon.png"/>
@@ -113,6 +128,24 @@
                         <AutoCompleteBox x:Name="ConfigFsInput" Watermark="Place file server address" Items="{Binding KnownFileServers}" Margin="0 0 0 5"/>
                         <TextBlock FontSize="18" Margin="0 0 0 5">Client:</TextBlock>
                         <TextBox x:Name="ConfigAdminKeyInput" Watermark="Admin key" Margin="0 0 0 5"/>
+                        <ListBox x:Name="ServerPresetListBox" Items="{Binding ServerPresets}">
+                            <ListBox.DataContext><vm:ServerPresetViewModel/></ListBox.DataContext>
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Rows="2" Columns="4" />
+                                </ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Classes="ServerPresetButton">
+                                        <StackPanel>
+                                            <TextBlock FontSize="36" TextAlignment="Center" Text="{Binding}" />
+                                            <TextBlock Text="{Binding}" />
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                     </StackPanel>
                 </StackPanel>
                 <Button Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Bottom" CornerRadius="5" Padding="40 10 40 10" Margin="5" Click="OnStartButtonPressed">Start</Button>

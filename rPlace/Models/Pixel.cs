@@ -16,12 +16,11 @@ public class Pixel
     //First byte is the code, pixel place is code for, uint32 is 
     public byte[] ToByteArray()
     {
-        var buffer = new byte[6];
-        var span = new Span<byte>(buffer);
-        span[0] = (byte) 4; //BitConverter.TryWriteBytes(span[0..], (byte) 4);
-        BinaryPrimitives.TryWriteUInt32BigEndian(span.Slice(1), (uint) Index);
-        span[5] = (byte) Colour;//BitConverter.TryWriteBytes(span[5..], (byte) Colour);
-        return span.ToArray();
+        var buffer = new byte[6]; //var span = new Span<byte>(buffer); span.Slice(0, ...)
+        buffer[0] = (byte) 4; //BitConverter.TryWriteBytes(span[0..], (byte) 4);
+        BinaryPrimitives.TryWriteUInt32BigEndian(buffer[1..], (uint) Index);
+        buffer[5] = (byte) Colour;//BitConverter.TryWriteBytes(span[5..], (byte) Colour);
+        return buffer; //span.ToArray();
     }
 
     public void Deconstruct(out int c, out int x, out int y)

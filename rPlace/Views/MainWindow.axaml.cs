@@ -47,8 +47,8 @@ public partial class MainWindow : Window
     }
 
     private Point MouseOverPixel(PointerEventArgs e) => new(
-        (int) Math.Clamp(Math.Floor((e.GetPosition(CanvasBackground).X - Board.Left) * (1 / Board.Zoom)), 0, Board.CanvasWidth ?? 500),
-        (int) Math.Clamp(Math.Floor((e.GetPosition(CanvasBackground).Y - Board.Top) * (1 / Board.Zoom)), 0, Board.CanvasHeight ?? 500)
+        (int) Math.Clamp(Math.Floor(e.GetPosition(CanvasBackground).X - Board.Left), 0, Board.CanvasWidth ?? 500),
+        (int) Math.Clamp(Math.Floor(e.GetPosition(CanvasBackground).Y - Board.Top), 0, Board.CanvasHeight ?? 500)
     );
 
     public MainWindow()
@@ -275,6 +275,7 @@ public partial class MainWindow : Window
         //SetPixels(px, 50);
         Board.Set(px);
         if (socket.IsRunning) socket.Send(px.ToByteArray());
+        foreach (var c in px.ToByteArray()) Console.WriteLine(c);
 
         PVM.CurrentColour = null;
     }
