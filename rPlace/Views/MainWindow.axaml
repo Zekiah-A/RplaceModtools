@@ -57,21 +57,6 @@
                 </Animation>
             </Style.Animations>
         </Style>
-        <Style Selector="Button.ServerPresetButton">
-            <Style.Animations>
-                <Animation Delay="0:0:3" Duration="0:0:2" Easing="QuadraticEaseOut"> 
-                    <KeyFrame Cue="0%">
-                        <Setter Property="Opacity" Value="0.0"/>
-                    </KeyFrame>
-                    <KeyFrame Cue="100%">
-                        <Setter Property="Opacity" Value="1.0"/>
-                    </KeyFrame>
-                </Animation>
-            </Style.Animations>
-            <Setter Property="MinWidth" Value="72"/>
-            <Setter Property="MinHeight" Value="72"/>
-            <Setter Property="Margin" Value="2"/>
-        </Style>
         <!-- TODO: Should use transition instead -->
         <Style Selector="Border.ToolsPanelOpen">
             <Style.Animations>
@@ -130,6 +115,37 @@
                         <TextBox x:Name="ConfigAdminKeyInput" Watermark="Admin key" Margin="0 0 0 5"/>
                         <ListBox x:Name="ServerPresetListBox" Items="{Binding ServerPresets}">
                             <ListBox.DataContext><vm:ServerPresetViewModel/></ListBox.DataContext>
+                            <ListBox.Styles>
+                                <Style Selector="ListBox">
+                                    <Setter Property="Background" Value="Transparent"></Setter>
+                                </Style>
+                                <Style Selector="ListBoxItem">
+                                    <Setter Property="Padding" Value="0" />
+                                </Style>
+                                <Style Selector="TextBlock.ServerPresetHeader">
+                                    <Setter Property="FontSize" Value="36" />
+                                    <Setter Property="TextAlignment" Value="Center" />
+                                    <Setter Property="Canvas.Right" Value="{Binding RelativeSource={RelativeSource Self}, Path=Width}" />
+                                </Style>
+                                <Style Selector="TextBlock.ServerPresetHeader:pointerover">
+                                    <Setter Property="Canvas.Right" Value="0" />
+                                </Style>
+                                <Style Selector="Button.ServerPresetButton">
+                                    <Style.Animations>
+                                        <Animation Delay="0:0:3" Duration="0:0:2" Easing="QuadraticEaseOut"> 
+                                            <KeyFrame Cue="0%">
+                                                <Setter Property="Opacity" Value="0.0"/>
+                                            </KeyFrame>
+                                            <KeyFrame Cue="100%">
+                                                <Setter Property="Opacity" Value="1.0"/>
+                                            </KeyFrame>
+                                        </Animation>
+                                    </Style.Animations>
+                                    <Setter Property="MinWidth" Value="72"/>
+                                    <Setter Property="MinHeight" Value="72"/>
+                                    <Setter Property="Margin" Value="2"/>
+                                </Style>
+                            </ListBox.Styles>
                             <ListBox.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <UniformGrid Rows="2" Columns="4" />
@@ -139,8 +155,16 @@
                                 <DataTemplate>
                                     <Button Classes="ServerPresetButton">
                                         <StackPanel>
-                                            <TextBlock FontSize="36" TextAlignment="Center" Text="{Binding}" />
-                                            <TextBlock Text="{Binding}" />
+                                            <Canvas>
+                                                <TextBlock Classes="ServerPresetHeader" Text="{Binding Websocket}">
+                                                    <TextBlock.Transitions>
+                                                        <Transitions>
+                                                            <DoubleTransition Property="Canvas.Right" Duration="0:0:1"/>
+                                                        </Transitions>
+                                                    </TextBlock.Transitions>
+                                                </TextBlock>
+                                            </Canvas>
+                                            <TextBlock Padding="0 36 0 0" Text="{Binding AdminKey}" />
                                         </StackPanel>
                                     </Button>
                                 </DataTemplate>

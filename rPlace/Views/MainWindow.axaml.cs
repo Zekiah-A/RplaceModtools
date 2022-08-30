@@ -21,10 +21,11 @@ public partial class MainWindow : Window
     private Point mouseLast;
     private Point mouseTravel;
     private Point lookingAtPixel;
-    private WebsocketClient socket;
     private readonly HttpClient client = new();
     private readonly Cursor arrow = new (StandardCursorType.Arrow);
     private readonly Cursor cross = new(StandardCursorType.Cross);
+    private WebsocketClient? socket;
+    private ServerPreset? currentPreset;
     
     private PaletteViewModel PVM => (PaletteViewModel?) PaletteListBox.DataContext ?? new PaletteViewModel();
     
@@ -134,7 +135,7 @@ public partial class MainWindow : Window
 
     private async Task FetchCacheBackuplist()
     {
-        var responseBody = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backuplist"))).Content.ReadAsStringAsync();
+        var responseBody = await (await Fetch(currentPreset.FileServer + "/backuplist")).Content.ReadAsStringAsync();
         var stack = new Stack(responseBody.Split("\n"));
         stack.Pop();
         stack.Push("place");
@@ -180,16 +181,24 @@ public partial class MainWindow : Window
     //App started
     private async void OnStartButtonPressed(object? sender, RoutedEventArgs e)
     {        
+        //Configure the current session's data
+        currentPreset = new ServerPreset
+        {
+            Websocket = ConfigWsInput.Text,
+            FileServer = ConfigFsInput.Text, 
+            AdminKey = ConfigAdminKeyInput.Text
+        };
+        if (!ServerPresetViewModel.ServerPresetExists(currentPreset)) ServerPresetViewModel.AddServerPreset(currentPreset);
+        
         //UI and connections
-        await CreateConnection(ConfigWsInput.Text + ConfigAdminKeyInput.Text);
-        Board.Board = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "place"))).Content.ReadAsByteArrayAsync();
+        await CreateConnection(currentPreset.Websocket + currentPreset.AdminKey);
+        Board.Board = await (await Fetch(currentPreset.FileServer + "/place")).Content.ReadAsByteArrayAsync();
         PlaceConfigPanel.IsVisible = false;
         DownloadBtn.IsEnabled = true;
 
         //Backup loading
         await FetchCacheBackuplist();
-        CanvasDropdown.SelectedIndex = 0;
-        //BackupCheckInterval();
+        CanvasDropdown.SelectedIndex = 0; //BackupCheckInterval()
     }
 
     private void OnBackgroundMouseDown(object? sender, PointerPressedEventArgs e)
@@ -292,12 +301,12 @@ public partial class MainWindow : Window
     {
         if (CanvasDropdown is null) return;
         var backupName = CanvasDropdown.SelectedItem as string ?? "place";
-        PreviewImg.Source = await CreateCanvasPreviewImage(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backups", backupName));
+        PreviewImg.Source = await CreateCanvasPreviewImage(currentPreset.FileServer + "/backups/" + backupName);
         
         //If we are viewing selected date only through the selection, then we are still technically on the pseudo-live canvas, viewselected only applies when we are on the live canvas
         if (ViewSelectedDate.IsChecked is false)
         {
-            Board.Board = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backups", backupName))).Content.ReadAsByteArrayAsync();
+            Board.Board = await (await Fetch(currentPreset.FileServer + "/backups/" + backupName)).Content.ReadAsByteArrayAsync();
             //If we are not looking at most recent backup, show a warning that we will not be able to modify it at all & disable tools.
             ToolsInformation.IsVisible = CanvasDropdown.SelectedIndex != 0;
             LiveCanvasWarning.IsVisible = CanvasDropdown.SelectedIndex != 0;
@@ -308,8 +317,8 @@ public partial class MainWindow : Window
         else
         {
             //TODO: This is essentially same as OnViewSelectedDateClicked
-            Board.Board = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "place"))).Content.ReadAsByteArrayAsync();
-            Board.SelectionBoard = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backups", backupName))).Content.ReadAsByteArrayAsync();
+            Board.Board = await (await Fetch(currentPreset.FileServer + "place")).Content.ReadAsByteArrayAsync();
+            Board.SelectionBoard = await (await Fetch(currentPreset.FileServer + "/backups/" + backupName)).Content.ReadAsByteArrayAsync();
             ToolsInformation.IsVisible = false;
             LiveCanvasWarning.IsVisible = false;
             PaintbrushTool.IsEnabled = true;
@@ -320,9 +329,9 @@ public partial class MainWindow : Window
     
     private async void OnViewSelectedDateChecked(object? sender, RoutedEventArgs e)
     {
-            Board.Board = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "place"))).Content.ReadAsByteArrayAsync();
+            Board.Board = await (await Fetch(currentPreset.FileServer + "/place")).Content.ReadAsByteArrayAsync();
             var backupName = CanvasDropdown.SelectedItem as string ?? "place";
-            Board.SelectionBoard = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backups", backupName))).Content.ReadAsByteArrayAsync();
+            Board.SelectionBoard = await (await Fetch(currentPreset.FileServer + "/backups/" + backupName)).Content.ReadAsByteArrayAsync();
             ToolsInformation.IsVisible = false;
             LiveCanvasWarning.IsVisible = false;
             PaintbrushTool.IsEnabled = true;
@@ -332,7 +341,7 @@ public partial class MainWindow : Window
 
     private async void OnViewSelectedDateUnchecked(object? sender, RoutedEventArgs e)
     {
-        Board.Board = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backups", (string) CanvasDropdown.SelectedItem!))).Content.ReadAsByteArrayAsync();
+        Board.Board = await (await Fetch(currentPreset.FileServer + "/'backups/" + (string) CanvasDropdown.SelectedItem)).Content.ReadAsByteArrayAsync();
         //If we are not looking at most recent backup, show a warning that we will not be able to modify it at all & disable tools.
         ToolsInformation.IsVisible = CanvasDropdown.SelectedIndex != 0;
         LiveCanvasWarning.IsVisible = CanvasDropdown.SelectedIndex != 0;
@@ -358,7 +367,7 @@ public partial class MainWindow : Window
             "Download place file image to system"
         );
         if (path is null) return;
-        var placeImg = await CreateCanvasPreviewImage(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "backups", CanvasDropdown.SelectedItem as string ?? "place"));
+        var placeImg = await CreateCanvasPreviewImage(currentPreset.FileServer + "/backups/" + CanvasDropdown.SelectedItem);
         placeImg?.Save(path);
     } 
 
@@ -432,7 +441,7 @@ public partial class MainWindow : Window
             //If we are already viewing place update it
             if (CanvasDropdown.SelectedIndex == 0)
             {
-                Board.Board = await (await Fetch(Path.Join(this.FindControl<AutoCompleteBox>("ConfigFsInput").Text, "place"))).Content.ReadAsByteArrayAsync();
+                Board.Board = await (await Fetch(currentPreset.FileServer + "/place")).Content.ReadAsByteArrayAsync();
             }
         }
     }
