@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Collections;
 using System.Diagnostics;
 using System.Net.WebSockets;
@@ -99,15 +100,18 @@ public partial class MainWindow : Window
             {
                 case 6: //Incoming pixel someone else sent
                 {
-                    //if (BitConverter.IsLittleEndian) Array.Reverse(msg.Binary);
                     var i = 0;
-                    foreach (var t in msg.Binary) Console.Write(t); Console.Write("\n");
                     while (i < msg.Binary.Length - 2)
                     {
-                        // //seti(data.getUint32(i += 1), data.getUint8(i += 4))
-                        var pos = BitConverter.ToInt32(msg.Binary, i += 1);
+                        var pos = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan()[(i += 1)..]);
                         var col = msg.Binary[i += 4];
-                        Console.WriteLine("c:{3} Incoming pixel {0}, {1}, {2}", pos % Board.CanvasWidth ?? 500, pos / Board.CanvasWidth ?? 500, col, code);
+                        Board.Set(new Pixel
+                        {
+                            Colour = col,
+                            Width = Board.CanvasWidth ?? 500,
+                            Height = Board.CanvasHeight ?? 500,
+                            Index = (int) pos
+                        });
                     }
                     break;
                 }
@@ -115,7 +119,6 @@ public partial class MainWindow : Window
                 {
                     var pos = BitConverter.ToUInt32(msg.Binary.ToArray(), 5);
                     var col = msg.Binary[9];
-                    Console.WriteLine("c:{3} Pixel coming back {0}, {1}, {2}", pos % Board.CanvasWidth ?? 500, pos / Board.CanvasWidth ?? 500, col, code);
                     break;
                 }
             }
@@ -136,7 +139,7 @@ public partial class MainWindow : Window
 
     private async Task FetchCacheBackuplist()
     {
-        var responseBody = await (await Fetch(MWVM.CurrentPreset.FileServer + "/backuplist")).Content.ReadAsStringAsync();
+        var responseBody = await (await Fetch(MWVM.CurrentPreset.FileServer + "backuplist")).Content.ReadAsStringAsync();
         var stack = new Stack(responseBody.Split("\n"));
         stack.Pop();
         stack.Push("place");
@@ -187,7 +190,7 @@ public partial class MainWindow : Window
         
         //UI and connections
         await CreateConnection(MWVM.CurrentPreset.Websocket + MWVM.CurrentPreset.AdminKey);
-        Board.Board = await (await Fetch(MWVM.CurrentPreset.FileServer + "/place")).Content.ReadAsByteArrayAsync();
+        Board.Board = await (await Fetch(MWVM.CurrentPreset.FileServer + "place")).Content.ReadAsByteArrayAsync();
         PlaceConfigPanel.IsVisible = false;
         DownloadBtn.IsEnabled = true;
 
@@ -242,8 +245,7 @@ public partial class MainWindow : Window
                     Width = Board.CanvasWidth ?? 500,
                     Height = Board.CanvasHeight ?? 500
                 };
-                Board.Set(px);
-                if (socket.IsRunning) socket.Send(px.ToByteArray());
+                SetPixels(px, MWVM.CurrentPaintBrushRadius);
                 //SetPixels(px, 20);
                 return;
             }
@@ -280,10 +282,8 @@ public partial class MainWindow : Window
             Height = Board.CanvasHeight ?? 500
         };
         //SetPixels(px, 50);
-        Board.Set(px);
-        if (socket.IsRunning) socket.Send(px.ToByteArray());
-        foreach (var c in px.ToByteArray()) Console.WriteLine(c);
-
+        SetPixels(px, MWVM.CurrentPaintBrushRadius);
+        
         PVM.CurrentColour = null;
     }
 
@@ -299,12 +299,12 @@ public partial class MainWindow : Window
     {
         if (CanvasDropdown is null) return;
         var backupName = CanvasDropdown.SelectedItem as string ?? "place";
-        PreviewImg.Source = await CreateCanvasPreviewImage(MWVM.CurrentPreset.FileServer + "/backups/" + backupName);
+        PreviewImg.Source = await CreateCanvasPreviewImage(MWVM.CurrentPreset.FileServer + "backups/" + backupName);
         
         //If we are viewing selected date only through the selection, then we are still technically on the pseudo-live canvas, viewselected only applies when we are on the live canvas
         if (ViewSelectedDate.IsChecked is false)
         {
-            Board.Board = await (await Fetch(MWVM.CurrentPreset.FileServer + "/backups/" + backupName)).Content.ReadAsByteArrayAsync();
+            Board.Board = await (await Fetch(MWVM.CurrentPreset.FileServer + "backups/" + backupName)).Content.ReadAsByteArrayAsync();
             //If we are not looking at most recent backup, show a warning that we will not be able to modify it at all & disable tools.
             ToolsInformation.IsVisible = CanvasDropdown.SelectedIndex != 0;
             LiveCanvasWarning.IsVisible = CanvasDropdown.SelectedIndex != 0;
@@ -316,7 +316,7 @@ public partial class MainWindow : Window
         {
             //TODO: This is essentially same as OnViewSelectedDateClicked
             Board.Board = await (await Fetch(MWVM.CurrentPreset.FileServer + "place")).Content.ReadAsByteArrayAsync();
-            Board.SelectionBoard = await (await Fetch(MWVM.CurrentPreset.FileServer + "/backups/" + backupName)).Content.ReadAsByteArrayAsync();
+            Board.SelectionBoard = await (await Fetch(MWVM.CurrentPreset.FileServer + "backups/" + backupName)).Content.ReadAsByteArrayAsync();
             ToolsInformation.IsVisible = false;
             LiveCanvasWarning.IsVisible = false;
             PaintbrushTool.IsEnabled = true;
@@ -327,9 +327,9 @@ public partial class MainWindow : Window
     
     private async void OnViewSelectedDateChecked(object? sender, RoutedEventArgs e)
     {
-            Board.Board = await (await Fetch(MWVM.CurrentPreset.FileServer + "/place")).Content.ReadAsByteArrayAsync();
+            Board.Board = await (await Fetch(MWVM.CurrentPreset.FileServer + "place")).Content.ReadAsByteArrayAsync();
             var backupName = CanvasDropdown.SelectedItem as string ?? "place";
-            Board.SelectionBoard = await (await Fetch(MWVM.CurrentPreset.FileServer + "/backups/" + backupName)).Content.ReadAsByteArrayAsync();
+            Board.SelectionBoard = await (await Fetch(MWVM.CurrentPreset.FileServer + "backups/" + backupName)).Content.ReadAsByteArrayAsync();
             ToolsInformation.IsVisible = false;
             LiveCanvasWarning.IsVisible = false;
             PaintbrushTool.IsEnabled = true;
@@ -339,7 +339,7 @@ public partial class MainWindow : Window
 
     private async void OnViewSelectedDateUnchecked(object? sender, RoutedEventArgs e)
     {
-        Board.Board = await (await Fetch(MWVM.CurrentPreset.FileServer + "/'backups/" + (string) CanvasDropdown.SelectedItem)).Content.ReadAsByteArrayAsync();
+        Board.Board = await (await Fetch(MWVM.CurrentPreset.FileServer + "backups/" + (string) CanvasDropdown.SelectedItem)).Content.ReadAsByteArrayAsync();
         //If we are not looking at most recent backup, show a warning that we will not be able to modify it at all & disable tools.
         ToolsInformation.IsVisible = CanvasDropdown.SelectedIndex != 0;
         LiveCanvasWarning.IsVisible = CanvasDropdown.SelectedIndex != 0;
@@ -365,7 +365,7 @@ public partial class MainWindow : Window
             "Download place file image to system"
         );
         if (path is null) return;
-        var placeImg = await CreateCanvasPreviewImage(MWVM.CurrentPreset.FileServer + "/backups/" + CanvasDropdown.SelectedItem);
+        var placeImg = await CreateCanvasPreviewImage(MWVM.CurrentPreset.FileServer + "backups/" + CanvasDropdown.SelectedItem);
         placeImg?.Save(path);
     } 
 
@@ -381,13 +381,13 @@ public partial class MainWindow : Window
     
     private void SetPixels(Pixel px, int radius)
     {
-        if (radius is 0 or 1)
+        if (radius == 1)
         {
             Board.Set(px);
-            socket.Send(px.ToByteArray());
+            if (socket.IsRunning) socket.Send(px.ToByteArray());
             return;
         }
-        
+
         for (var x = 0 - radius / 2; x < radius / 2; x++)
         {
             for (var y = 0 - radius / 2; y < radius / 2; y++)
@@ -396,7 +396,8 @@ public partial class MainWindow : Window
                 radiusPx.X += x;
                 radiusPx.Y += y;
                 Board.Set(radiusPx);
-                socket.Send(px.ToByteArray());
+                Thread.Sleep(30);
+                if (socket.IsRunning) socket.Send(px.ToByteArray());
             }
         }
     }
@@ -439,7 +440,7 @@ public partial class MainWindow : Window
             //If we are already viewing place update it
             if (CanvasDropdown.SelectedIndex == 0)
             {
-                Board.Board = await (await Fetch(MWVM.CurrentPreset.FileServer + "/place")).Content.ReadAsByteArrayAsync();
+                Board.Board = await (await Fetch(MWVM.CurrentPreset.FileServer + "place")).Content.ReadAsByteArrayAsync();
             }
         }
     }

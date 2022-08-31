@@ -170,11 +170,11 @@ public partial class SkCanvas : UserControl
             {
                 using var img = new SKBitmap(ParentSk.CanvasWidth ?? 500, ParentSk.CanvasHeight ?? 500);
                 for (var i = 0; i < selectionBoard.Length; i++)
-                {   //TODO: This method is not fully efficient and only attempting to draw at all within the selection bounds would be better.
-                    foreach (var sel in ParentSk.Selections)
-                    {   //Loop through the whole board, if pixel is within bounds of selection, draw, otherwise skip.
-                        if (i % (ParentSk.CanvasWidth ?? 500) >= sel.Tl.X && i % (ParentSk.CanvasWidth ?? 500) <= sel.Br.X && i / (ParentSk.CanvasHeight ?? 500) >= sel.Tl.Y && i / (ParentSk.CanvasHeight ?? 500) <= sel.Br.Y)
-                            img.SetPixel(i % ParentSk.CanvasWidth ?? 500, i / ParentSk.CanvasHeight ?? 500, PaletteViewModel.Colours[selectionBoard[i]]);
+                {
+                    //TODO: This method is not fully efficient and only attempting to draw at all within the selection bounds would be better.
+                    foreach (var sel in ParentSk.Selections.Where(sel => i % (ParentSk.CanvasWidth ?? 500) >= sel.Tl.X && i % (ParentSk.CanvasWidth ?? 500) <= sel.Br.X && i / (ParentSk.CanvasHeight ?? 500) >= sel.Tl.Y && i / (ParentSk.CanvasHeight ?? 500) <= sel.Br.Y))
+                    {
+                        img.SetPixel(i % ParentSk.CanvasWidth ?? 500, i / ParentSk.CanvasWidth ?? 500, PaletteViewModel.Colours[selectionBoard[i]]);
                     }
                 }
                 selectionCanvasCache = SKImage.FromBitmap(img);

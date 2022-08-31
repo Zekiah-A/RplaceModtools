@@ -6,7 +6,16 @@ namespace rPlace.Models;
 
 public class Pixel
 {
-    public int Index => X % Width + (Y % Height) * Width;
+    public int Index
+    {
+        get => X % Width + Y % Height * Width;
+        init
+        {
+            X = value % Width;
+            Y = value / Width;
+        }
+    }
+
     public int Colour { get; init; }
     public int X { get; set; }
     public int Y { get; set; }
@@ -18,7 +27,7 @@ public class Pixel
     {
         var buffer = new byte[6]; //var span = new Span<byte>(buffer); span.Slice(0, ...)
         buffer[0] = (byte) 4; //BitConverter.TryWriteBytes(span[0..], (byte) 4);
-        BinaryPrimitives.TryWriteUInt32BigEndian(buffer[1..], (uint) Index);
+        BinaryPrimitives.TryWriteUInt32BigEndian(buffer.AsSpan()[1..], (uint) Index);
         buffer[5] = (byte) Colour;//BitConverter.TryWriteBytes(span[5..], (byte) Colour);
         return buffer; //span.ToArray();
     }

@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:views="clr-namespace:rPlace.Views"
+        xmlns:rPlace="clr-namespace:rPlace"
         mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="600" MinWidth="400"
         x:Class="rPlace.Views.MainWindow"
         Icon="/Assets/favicon.ico"
@@ -96,6 +97,10 @@
             <Setter Property="BorderThickness" Value="0"/>
         </Style>
     </Window.Styles>
+
+    <Window.Resources>
+        <rPlace:NumericSignConverter x:Key="NumericSignConverter"/>
+    </Window.Resources>
     
     <Design.DataContext>
        <vm:MainWindowViewModel/>
@@ -140,10 +145,10 @@
                                 <Style Selector="TextBlock.ServerPresetHeader">
                                     <Setter Property="FontSize" Value="36" />
                                     <Setter Property="TextAlignment" Value="Center" />
-                                    <Setter Property="Canvas.Right" Value="{Binding RelativeSource={RelativeSource Self}, Path=Width}" />
+                                    <Setter Property="Canvas.Left" Value="0" />
                                 </Style>
                                 <Style Selector="TextBlock.ServerPresetHeader:pointerover">
-                                    <Setter Property="Canvas.Right" Value="0" />
+                                    <Setter Property="Canvas.Left" Value="{Binding RelativeSource={RelativeSource Self}, Path=DesiredSize.Width, Converter={StaticResource NumericSignConverter}}" />
                                 </Style>
                             </ListBox.Styles>
                             <ListBox.ItemsPanel>
@@ -158,7 +163,7 @@
                                             <TextBlock Classes="ServerPresetHeader" Text="{Binding Websocket}">
                                                 <TextBlock.Transitions>
                                                     <Transitions>
-                                                        <DoubleTransition Property="Canvas.Right" Duration="0:0:1"/>
+                                                        <DoubleTransition Property="Canvas.Left" Duration="0:0:6"/>
                                                     </Transitions>
                                                 </TextBlock.Transitions>
                                             </TextBlock>
@@ -185,7 +190,11 @@
                 <Border.Background>
                     <SolidColorBrush Color="Gray" Opacity="0.5" />
                 </Border.Background>
-                <TextBlock x:Name="LiveCanvasWarning" IsVisible="False" Foreground="Yellow" TextWrapping="Wrap">⚠️ Warning: You are not on the live canvas, therefore any edits will not be applied.</TextBlock>
+                <StackPanel>
+                    <TextBlock x:Name="LiveCanvasWarning" IsVisible="False" Foreground="Yellow" TextWrapping="Wrap">⚠️ Warning: You are not on the live canvas, therefore any edits will not be applied.</TextBlock>
+                    <TextBlock FontSize="18">Brush radius:</TextBlock>
+                    <NumericUpDown Minimum="1" Maximum="10" Height="16" Value="{Binding CurrentPaintBrushRadius}"/>                    
+                </StackPanel>
                 <!--<ContentControl>
                     <ContentControl.ContentTemplate>
                         
@@ -230,7 +239,7 @@
                     <TextBlock FontSize="24">Tools:</TextBlock>
                     <TextBlock FontSize="18">Canvas:</TextBlock>
                     <AutoCompleteBox Margin="5" Watermark="Switch canvas/server" Items="{Binding KnownWebsockets}" IsEnabled="False"/>
-                    <ComboBox Margin="5" SelectedIndex="0" x:Name="CanvasDropdown" SelectionChanged="OnCanvasDropdownSelectionChanged">
+                    <ComboBox Margin="5" SelectedIndex="0" x:Name="CanvasDropdown" VirtualizationMode="Simple" SelectionChanged="OnCanvasDropdownSelectionChanged">
                         <ToolTip.Tip>Select a previous backup of the canvas for viewing and rollback.</ToolTip.Tip>
                         <ComboBoxItem>place</ComboBoxItem>
                     </ComboBox>
