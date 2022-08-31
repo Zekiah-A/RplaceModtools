@@ -7,7 +7,7 @@ namespace rPlace.ViewModels;
 
 public partial class ServerPresetViewModel : ObservableObject
 {
-    private ObservableCollection<ServerPreset> ServerPresets
+    public ObservableCollection<ServerPreset> ServerPresets
     {
         get
         {
@@ -28,7 +28,7 @@ public partial class ServerPresetViewModel : ObservableObject
         }
     }
 
-    public static void AddServerPreset(ServerPreset preset)
+    public static void SaveServerPreset(ServerPreset preset)
     {
         var contents = preset.Websocket + Environment.NewLine + preset.FileServer + Environment.NewLine + preset.AdminKey + Environment.NewLine;
         File.AppendAllText(Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "server_presets"), contents);
@@ -36,13 +36,17 @@ public partial class ServerPresetViewModel : ObservableObject
 
     public static bool ServerPresetExists(ServerPreset preset)
     {
-        var lines = File.ReadLines(Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "server_presets"));
-        var arr = lines as string[] ?? lines.ToArray();
-        for (var i = 0; i < arr.Length; i += 3)
+        try
         {
-            if (arr[i..(i + 3)][0] == preset.Websocket && arr[i..(i + 3)][1] == preset.FileServer && arr[i..(i + 3)][2] == preset.AdminKey)
-                return true;
+            var lines = File.ReadLines(Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "server_presets"));
+            var arr = lines as string[] ?? lines.ToArray();
+            for (var i = 0; i < arr.Length; i += 3)
+            {
+                if (arr[i..(i + 3)][0] == preset.Websocket && arr[i..(i + 3)][1] == preset.FileServer && arr[i..(i + 3)][2] == preset.AdminKey)
+                    return true;
+            }
         }
+        catch {}
         return false;
     }
 }

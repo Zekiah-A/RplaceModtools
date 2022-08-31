@@ -9,8 +9,4 @@
     <Application.Styles>
         <FluentTheme Mode="Light"/>
     </Application.Styles>
-    
-    <Application.Resources>
-        <SolidColorBrush x:Key="CanvasBackground">Yellow</SolidColorBrush>
-    </Application.Resources>
 </Application>
