@@ -78,6 +78,63 @@ public partial class MainWindow : Window
         });
     }
     
+    //Decompress changes so it can be put onto canv
+    public void RunLengthChanges(byte[] data)
+    {
+        int boardI = 0;
+        BinaryPrimitives.TryReadUInt32BigEndian(data.AsSpan()[1..], out var width);
+        BinaryPrimitives.TryReadUInt32BigEndian(data.AsSpan()[5..], out var height);
+        Board.CanvasWidth = (int) width;
+        Board.CanvasHeight = (int) height;
+        //Board.Changes = new []{}
+
+        //var i = 9;
+        for (var i = 9; i < data.Length;)
+        {
+            var cell = data[i++];
+            var c = cell >> 6;
+            switch (c)
+            {
+                case 1:
+                    c = data[i++];
+                    break;
+                case 2:
+                    c = BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan()[i++..]);
+                    i++;
+                    break;
+                case 3:
+                    c = (int) BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan()[i++..]);
+                    i += 3;
+                    break;
+            }
+            boardI += c;
+            
+        }
+        
+        /*
+            function runLengthChanges(data, a){
+			    let i = 9, boardI = 0
+			    waitingGame.start()
+			    let w = data.getUint32(1), h = data.getUint32(5)
+			    if(w != WIDTH || h != HEIGHT)setsize(w, h)
+			    board = new Uint8Array(a)
+			    while(i < data.byteLength){
+				    let cell = data.getUint8(i++)
+				    let c = cell >> 6
+				    if(c == 1)c = data.getUint8(i++)
+				    else if(c == 2)c = data.getUint16(i++),i++
+				    else if(c == 3)c = data.getUint32(i++),i+=3
+				    boardI += c
+				    board[boardI++] = cell & 63
+			    }
+			    renderAll()
+			    loadingScreen.style.opacity = 0
+			    setTimeout(()=>loadingScreen.remove(),300)
+			    setTimeout(()=>waitingGame.stop(),300)
+		    }
+         */
+    }
+
     private async Task CreateConnection(string uri)
     {
         var factory = new Func<ClientWebSocket>(() =>
@@ -388,6 +445,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        var radiusStack = new Stack<Pixel>();
         for (var x = 0 - radius / 2; x < radius / 2; x++)
         {
             for (var y = 0 - radius / 2; y < radius / 2; y++)
@@ -396,10 +454,17 @@ public partial class MainWindow : Window
                 radiusPx.X += x;
                 radiusPx.Y += y;
                 Board.Set(radiusPx);
-                Thread.Sleep(30);
-                if (socket.IsRunning) socket.Send(px.ToByteArray());
+                radiusStack.Push(radiusPx);
             }
         }
+        Task.Run(() =>
+        {
+            while (radiusStack.Count != 0)
+            {
+                Thread.Sleep(30);
+                if (socket.IsRunning) socket.Send(radiusStack.Pop().ToByteArray());
+            }
+        });
     }
 
     private void OnToggleThemePressed(object? sender, RoutedEventArgs e)

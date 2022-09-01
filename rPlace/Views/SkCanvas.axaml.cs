@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Numerics;
 using Avalonia;
@@ -21,7 +22,7 @@ public partial class SkCanvas : UserControl
     public Stack<Selection> Selections = new();
     
     private static byte[]? board;
-    private static char[]? changes;
+    private static byte[]? changes;
     private static byte[]? selectionBoard;
     private static byte[]? pixelsToDraw;
     private static SKImage? canvasCache;
@@ -43,7 +44,7 @@ public partial class SkCanvas : UserControl
         }
     }
 
-    public char[]? Changes
+    public byte[]? Changes
     {
         get => changes;
         set
@@ -218,33 +219,7 @@ public partial class SkCanvas : UserControl
         using var canvDrawOp = new CustomDrawOp(new Rect(0, 0, Bounds.Width, Bounds.Height), this); //Let's disable the global customdrawop for now until we fix above todo
         context.Custom(canvDrawOp);
     }
-
-    //Decompress changes so it can be put onto canv
-    public void RunLengthChanges(char[] data)
-    {
-        int i = 9, boardI = 0;
-        UInt32 w = data[1], h = data[5];
-        //board8 = new char[250000];
-        while (i < data.Length)
-        {
-            var cell = data[i++];
-            var c = cell >> 6;
-            if (c == 1) c = c = data[i++];
-            else if (c == 2)
-            {
-                c = data[i++];
-                i++;
-            }
-            else if (c == 3)
-            {
-                c = data[i++];
-                i += 3;
-            }
-            boardI += c;
-            //board8[boardI++] = (char) (cell & 63);
-        }
-    }
-
+    
     public void StartSelection(Point topLeft, Point bottomRight)
     {
         var sel = new Selection
