@@ -1,0 +1,22 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:viewModels="clr-namespace:rPlace.ViewModels"
+             mc:Ignorable="d"
+             x:Class="rPlace.Views.PaintBrushStateInfo">
+  
+  <Design.DataContext>
+    <viewModels:PaintBrushStateInfoViewModel/>
+  </Design.DataContext>
+  <UserControl.DataContext>
+    <viewModels:LiveCanvasStateInfoViewModel/>
+  </UserControl.DataContext>
+
+  <StackPanel>
+      <TextBlock FontSize="16">Brush radius:</TextBlock>
+      <NumericUpDown Minimum="1" Maximum="10" Height="16" Value="{Binding CurrentPaintBrushRadius}"/>      
+      <TextBlock FontSize="16">Brush shape:</TextBlock>
+      <ToggleButton Content="{Binding currentBrushShape, Converter={StaticResource ShapeEmojiConverter}}"/>
+    </StackPanel>
+</UserControl>

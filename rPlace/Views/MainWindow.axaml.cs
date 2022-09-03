@@ -79,19 +79,17 @@ public partial class MainWindow : Window
     }
     
     //Decompress changes so it can be put onto canv
-    public void RunLengthChanges(byte[] data)
+    private byte[] RunLengthChanges(byte[] data)
     {
-        int boardI = 0;
-        BinaryPrimitives.TryReadUInt32BigEndian(data.AsSpan()[1..], out var width);
-        BinaryPrimitives.TryReadUInt32BigEndian(data.AsSpan()[5..], out var height);
-        Board.CanvasWidth = (int) width;
-        Board.CanvasHeight = (int) height;
-        //Board.Changes = new []{}
+        var changeI = 0;
+        Board.CanvasWidth = (int) BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan()[1..]);
+        Board.CanvasHeight = (int) BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan()[5..]);
+        var changes = new byte[(int) (Board.CanvasWidth * Board.CanvasHeight)];
 
-        //var i = 9;
         for (var i = 9; i < data.Length;)
         {
             var cell = data[i++];
+            Console.WriteLine(cell);
             var c = cell >> 6;
             switch (c)
             {
@@ -107,32 +105,10 @@ public partial class MainWindow : Window
                     i += 3;
                     break;
             }
-            boardI += c;
-            
+            changeI += c;
+            changes[changeI] = (byte) (cell & 63);
         }
-        
-        /*
-            function runLengthChanges(data, a){
-			    let i = 9, boardI = 0
-			    waitingGame.start()
-			    let w = data.getUint32(1), h = data.getUint32(5)
-			    if(w != WIDTH || h != HEIGHT)setsize(w, h)
-			    board = new Uint8Array(a)
-			    while(i < data.byteLength){
-				    let cell = data.getUint8(i++)
-				    let c = cell >> 6
-				    if(c == 1)c = data.getUint8(i++)
-				    else if(c == 2)c = data.getUint16(i++),i++
-				    else if(c == 3)c = data.getUint32(i++),i+=3
-				    boardI += c
-				    board[boardI++] = cell & 63
-			    }
-			    renderAll()
-			    loadingScreen.style.opacity = 0
-			    setTimeout(()=>loadingScreen.remove(),300)
-			    setTimeout(()=>waitingGame.stop(),300)
-		    }
-         */
+        return changes;
     }
 
     private async Task CreateConnection(string uri)
@@ -155,6 +131,9 @@ public partial class MainWindow : Window
             var code = msg.Binary[0];
             switch (code)
             {
+                case 2:
+                    Board.Changes = RunLengthChanges(msg.Binary);
+                    break;
                 case 6: //Incoming pixel someone else sent
                 {
                     var i = 0;
@@ -363,8 +342,7 @@ public partial class MainWindow : Window
         {
             Board.Board = await (await Fetch(MWVM.CurrentPreset.FileServer + "backups/" + backupName)).Content.ReadAsByteArrayAsync();
             //If we are not looking at most recent backup, show a warning that we will not be able to modify it at all & disable tools.
-            ToolsInformation.IsVisible = CanvasDropdown.SelectedIndex != 0;
-            LiveCanvasWarning.IsVisible = CanvasDropdown.SelectedIndex != 0;
+            //LiveCanvasWarning.IsVisible = CanvasDropdown.SelectedIndex != 0;
             PaintbrushTool.IsEnabled = CanvasDropdown.SelectedIndex == 0;
             RubberTool.IsEnabled = CanvasDropdown.SelectedIndex == 0;
             SelectTool.IsEnabled = CanvasDropdown.SelectedIndex == 0;
@@ -374,8 +352,7 @@ public partial class MainWindow : Window
             //TODO: This is essentially same as OnViewSelectedDateClicked
             Board.Board = await (await Fetch(MWVM.CurrentPreset.FileServer + "place")).Content.ReadAsByteArrayAsync();
             Board.SelectionBoard = await (await Fetch(MWVM.CurrentPreset.FileServer + "backups/" + backupName)).Content.ReadAsByteArrayAsync();
-            ToolsInformation.IsVisible = false;
-            LiveCanvasWarning.IsVisible = false;
+            //LiveCanvasWarning.IsVisible = false;
             PaintbrushTool.IsEnabled = true;
             RubberTool.IsEnabled = true;
             SelectTool.IsEnabled = true;
@@ -387,8 +364,7 @@ public partial class MainWindow : Window
             Board.Board = await (await Fetch(MWVM.CurrentPreset.FileServer + "place")).Content.ReadAsByteArrayAsync();
             var backupName = CanvasDropdown.SelectedItem as string ?? "place";
             Board.SelectionBoard = await (await Fetch(MWVM.CurrentPreset.FileServer + "backups/" + backupName)).Content.ReadAsByteArrayAsync();
-            ToolsInformation.IsVisible = false;
-            LiveCanvasWarning.IsVisible = false;
+            //LiveCanvasWarning.IsVisible = false;
             PaintbrushTool.IsEnabled = true;
             RubberTool.IsEnabled = true;
             SelectTool.IsEnabled = true;
@@ -396,10 +372,9 @@ public partial class MainWindow : Window
 
     private async void OnViewSelectedDateUnchecked(object? sender, RoutedEventArgs e)
     {
-        Board.Board = await (await Fetch(MWVM.CurrentPreset.FileServer + "backups/" + (string) CanvasDropdown.SelectedItem)).Content.ReadAsByteArrayAsync();
+        Board.Board = await (await Fetch(MWVM.CurrentPreset.FileServer + "backups/" + CanvasDropdown.SelectedItem)).Content.ReadAsByteArrayAsync();
         //If we are not looking at most recent backup, show a warning that we will not be able to modify it at all & disable tools.
-        ToolsInformation.IsVisible = CanvasDropdown.SelectedIndex != 0;
-        LiveCanvasWarning.IsVisible = CanvasDropdown.SelectedIndex != 0;
+        //LiveCanvasWarning.IsVisible = CanvasDropdown.SelectedIndex != 0;
         PaintbrushTool.IsEnabled = CanvasDropdown.SelectedIndex == 0;
         RubberTool.IsEnabled = CanvasDropdown.SelectedIndex == 0;
         SelectTool.IsEnabled = CanvasDropdown.SelectedIndex == 0;
@@ -441,28 +416,51 @@ public partial class MainWindow : Window
         if (radius == 1)
         {
             Board.Set(px);
-            if (socket.IsRunning) socket.Send(px.ToByteArray());
+            if (socket is {IsRunning: true}) socket.Send(px.ToByteArray());
             return;
         }
 
         var radiusStack = new Stack<Pixel>();
-        for (var x = 0 - radius / 2; x < radius / 2; x++)
+        if (MWVM.CurrentBrushShape == Shape.Square)
         {
-            for (var y = 0 - radius / 2; y < radius / 2; y++)
+            var diameter = 2 * radius + 1;
+            for (var i = 0; i < diameter; i++)
             {
-                var radiusPx = px.Clone();
-                radiusPx.X += x;
-                radiusPx.Y += y;
-                Board.Set(radiusPx);
-                radiusStack.Push(radiusPx);
+                for (var j = 0; j < diameter; j++)
+                {
+                    var y = j-radius;
+                    var x = i-radius;
+                    
+                    if (x * x + y * y > radius * radius + 1) continue;
+                    var radiusPx = px.Clone();
+                    radiusPx.X += x;
+                    radiusPx.Y += y;
+                    Board.Set(radiusPx);
+                    radiusStack.Push(radiusPx);
+                }
             }
         }
+        else
+        {
+            for (var x = 0 - radius / 2; x < radius / 2; x++)
+            {
+                for (var y = 0 - radius / 2; y < radius / 2; y++)
+                {
+                    var radiusPx = px.Clone();
+                    radiusPx.X += x;
+                    radiusPx.Y += y;
+                    Board.Set(radiusPx);
+                    radiusStack.Push(radiusPx);
+                }
+            }
+        }
+        
         Task.Run(() =>
         {
             while (radiusStack.Count != 0)
             {
                 Thread.Sleep(30);
-                if (socket.IsRunning) socket.Send(radiusStack.Pop().ToByteArray());
+                if (socket is {IsRunning: true}) socket.Send(radiusStack.Pop().ToByteArray());
             }
         });
     }

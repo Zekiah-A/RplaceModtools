@@ -26,6 +26,7 @@ public partial class SkCanvas : UserControl
     private static byte[]? selectionBoard;
     private static byte[]? pixelsToDraw;
     private static SKImage? canvasCache;
+    private static SKImage? changesCache;
     private static SKImage? selectionCanvasCache;
     private static float canvZoom = 1;
     private static SKPoint canvPosition = SKPoint.Empty;
@@ -105,19 +106,18 @@ public partial class SkCanvas : UserControl
         AvaloniaXamlLoader.Load(this);
     }
 
-    class CustomDrawOp : ICustomDrawOperation
+    private class CustomDrawOp : ICustomDrawOperation
     {
         private SkCanvas ParentSk { get; }
+        public Rect Bounds { get; }
 
         public CustomDrawOp(Rect bounds, SkCanvas parentSk)
         {
             Bounds = bounds;
             ParentSk = parentSk;
         }
-        
+
         public void Dispose() { }
-        
-        public Rect Bounds { get; set; }
         public bool HitTest(Point p) => false;
         public bool Equals(ICustomDrawOperation? other) => false;
         
@@ -142,12 +142,22 @@ public partial class SkCanvas : UserControl
                 img.Dispose();
                 board = null;
             }
-            if (canvasCache is null)
+            if (changes is not null)
+            {
+                using var img = new SKBitmap(ParentSk.CanvasWidth ?? 500, ParentSk.CanvasHeight ?? 500, true);
+                for (var i = 0; i < changes.Length; i++)
+                    img.SetPixel(i % ParentSk.CanvasWidth ?? 500, i / ParentSk.CanvasWidth ?? 500, PaletteViewModel.Colours[changes[i]]);
+                changesCache = SKImage.FromBitmap(img);
+                img.Dispose();
+                changes = null;
+            }
+            
+            if (canvasCache is null && changesCache is null)
             {
                 //Draw rplacetk logo background instead
-                var bck = new SKPaint(); bck.Color = new SKColor(51, 51, 51, 100);
-                var frg = new SKPaint(); frg.Color = new SKColor(255, 87, 0, 200);
-                var dot = new SKPaint(); dot.Color = SKColors.Black;
+                var bck = new SKPaint { Color = new SKColor(51, 51, 51, 100) };
+                var frg = new SKPaint { Color = new SKColor(255, 87, 0, 200) };
+                var dot = new SKPaint { Color = SKColors.Black };
                 canvas.DrawRect(0, 0, 500, 500, bck); //background
                 canvas.DrawRect(74, 74, 280, 70, frg); //top
                 canvas.DrawRect(74, 144, 70, 280, frg); //left
@@ -155,7 +165,11 @@ public partial class SkCanvas : UserControl
                 canvas.DrawRect(214, 354, 140, 70, frg); //bottom
                 canvas.DrawRect(214, 214, 72, 72, dot); //centre
             }
-            else canvas.DrawImage(canvasCache, 0, 0);
+            else
+            {
+                canvas.DrawImage(canvasCache, 0, 0);
+                canvas.DrawImage(changesCache, 0, 0);
+            }
             
             //Draw all pixels that have come in to the canvas.
             if (pixelsToDraw is not null)
@@ -215,9 +229,7 @@ public partial class SkCanvas : UserControl
     public override void Render(DrawingContext context)
     {
         base.Render(context);
-        //TODO: Making a new instance of the CanvdDrawOp each time is really inefficient, but so far it is the only found way to force a redraw on the render thread.
-        using var canvDrawOp = new CustomDrawOp(new Rect(0, 0, Bounds.Width, Bounds.Height), this); //Let's disable the global customdrawop for now until we fix above todo
-        context.Custom(canvDrawOp);
+        context.Custom(new CustomDrawOp(new Rect(0, 0, Bounds.Width, Bounds.Height), this));
     }
     
     public void StartSelection(Point topLeft, Point bottomRight)
