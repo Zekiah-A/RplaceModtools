@@ -1,7 +1,10 @@
 using System;
+using System.ComponentModel;
+using System.Text;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using rPlace.ViewModels;
+using rPlace.Views;
 
 namespace rPlace
 {
@@ -9,22 +12,21 @@ namespace rPlace
     {
         public IControl Build(object data)
         {
-            var name = data.GetType().FullName!.Replace("ViewModel", "View");
+            var name = data.GetType().FullName!
+                .Replace("ViewModels", "Views")
+                .Replace("ViewModel", "");
             var type = Type.GetType(name);
 
             if (type != null)
             {
                 return (Control) Activator.CreateInstance(type)!;
             }
-            else
-            {
-                return new TextBlock {Text = "Not Found: " + name};
-            }
+            return new TextBlock {Text = "Not Found: " + name};
         }
 
         public bool Match(object data)
         {
-            return data is ViewModelBase;
+            return data is INotifyPropertyChanged;
         }
     }
 }

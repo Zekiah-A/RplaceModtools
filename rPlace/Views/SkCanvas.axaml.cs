@@ -23,10 +23,13 @@ public partial class SkCanvas : UserControl
     
     private static byte[]? board;
     private static byte[]? changes;
+    private static bool boardCached;
+    private static bool changesCached;
+    private static SKImage? boardCache;
+    private static SKImage? changesCache;
+
     private static byte[]? selectionBoard;
     private static byte[]? pixelsToDraw;
-    private static SKImage? canvasCache;
-    private static SKImage? changesCache;
     private static SKImage? selectionCanvasCache;
     private static float canvZoom = 1;
     private static SKPoint canvPosition = SKPoint.Empty;
@@ -41,6 +44,7 @@ public partial class SkCanvas : UserControl
         set
         {
             board = value;
+            boardCached = false;
             Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
         }
     }
@@ -51,6 +55,7 @@ public partial class SkCanvas : UserControl
         set
         {
             changes = value;
+            changesCached = false;
             Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
         }
     }
@@ -133,26 +138,34 @@ public partial class SkCanvas : UserControl
             canvas.Translate(canvPosition.X, canvPosition.Y);
 
             //Equivalent of renderAll
-            if (board is not null)
+            if (!boardCached && board is not null)
             {
                 using var img = new SKBitmap(ParentSk.CanvasWidth ?? 500, ParentSk.CanvasHeight ?? 500, true);
                 for (var i = 0; i < board.Length; i++)
                     img.SetPixel(i % ParentSk.CanvasWidth ?? 500, i / ParentSk.CanvasWidth ?? 500, PaletteViewModel.Colours[board[i]]);
-                canvasCache = SKImage.FromBitmap(img);
+                boardCache = SKImage.FromBitmap(img);
                 img.Dispose();
-                board = null;
+                boardCached = true;
             }
-            if (changes is not null)
+            if (!changesCached && changes is not null)
             {
                 using var img = new SKBitmap(ParentSk.CanvasWidth ?? 500, ParentSk.CanvasHeight ?? 500, true);
                 for (var i = 0; i < changes.Length; i++)
                     img.SetPixel(i % ParentSk.CanvasWidth ?? 500, i / ParentSk.CanvasWidth ?? 500, PaletteViewModel.Colours[changes[i]]);
                 changesCache = SKImage.FromBitmap(img);
                 img.Dispose();
-                changes = null;
+                changesCached = true;
             }
             
-            if (canvasCache is null && changesCache is null)
+            if (changesCached && changesCache is not null)
+            {
+                canvas.DrawImage(changesCache, 0, 0);
+            }
+            if (boardCached && boardCache is not null)
+            {
+                canvas.DrawImage(boardCache, 0, 0);
+            }
+            else
             {
                 //Draw rplacetk logo background instead
                 var bck = new SKPaint { Color = new SKColor(51, 51, 51, 100) };
@@ -164,11 +177,7 @@ public partial class SkCanvas : UserControl
                 canvas.DrawRect(354, 144, 70, 280, frg); //right
                 canvas.DrawRect(214, 354, 140, 70, frg); //bottom
                 canvas.DrawRect(214, 214, 72, 72, dot); //centre
-            }
-            else
-            {
-                canvas.DrawImage(canvasCache, 0, 0);
-                canvas.DrawImage(changesCache, 0, 0);
+
             }
             
             //Draw all pixels that have come in to the canvas.

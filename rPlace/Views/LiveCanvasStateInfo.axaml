@@ -4,7 +4,9 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:viewModels="clr-namespace:rPlace.ViewModels"
              mc:Ignorable="d"
-             x:Class="rPlace.Views.LiveCanvasStateInfo">
+             x:Class="rPlace.Views.LiveCanvasStateInfo"
+             HorizontalAlignment="Stretch"
+             Height="16">
   
   <Design.DataContext>
     <viewModels:LiveCanvasStateInfoViewModel/>
@@ -13,7 +15,5 @@
     viewModels:LiveCanvasStateInfoViewModel/>
   </UserControl.DataContext>
   
-  <TextBlock x:Name="LiveCanvasWarning" IsVisible="False" Foreground="Yellow" TextWrapping="Wrap">
-      ⚠️ Warning: You are not on the live canvas, therefore any edits will not be applied.
-    </TextBlock>
+  <TextBlock x:Name="LiveCanvasWarning" Foreground="Yellow">⚠️ Warning: You are not on the live canvas, therefore any edits will not be applied.</TextBlock>
 </UserControl>

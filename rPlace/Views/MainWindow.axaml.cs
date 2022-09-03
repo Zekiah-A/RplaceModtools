@@ -10,7 +10,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Themes.Fluent;
 using DynamicData;
-using JetBrains.Annotations;
+using Microsoft.Extensions.DependencyInjection;
 using rPlace.Models;
 using SkiaSharp;
 using rPlace.ViewModels;
@@ -28,9 +28,11 @@ public partial class MainWindow : Window
     private readonly Cursor cross = new(StandardCursorType.Cross);
     private WebsocketClient? socket;
     
+    private MainWindowViewModel viewModel;
+    //TODO: Switch these to using dependency injection
     private PaletteViewModel PVM => (PaletteViewModel) PaletteListBox.DataContext!;
-    private MainWindowViewModel MWVM => (MainWindowViewModel) DataContext!;
     private ServerPresetViewModel SPVM => (ServerPresetViewModel) ServerPresetListBox.DataContext!;
+    
     
     private Point LookingAtPixel
     {
@@ -57,6 +59,9 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
+        viewModel = App.Current.Services.GetRequiredService<MainWindowViewModel>();
+        DataContext = viewModel;
+        
         InitializeComponent();
         CanvasBackground.AddHandler(PointerPressedEvent, OnBackgroundMouseDown, handledEventsToo: false);
         CanvasBackground.AddHandler(PointerMovedEvent, OnBackgroundMouseMove, handledEventsToo: false);
@@ -175,7 +180,7 @@ public partial class MainWindow : Window
 
     private async Task FetchCacheBackuplist()
     {
-        var responseBody = await (await Fetch(MWVM.CurrentPreset.FileServer + "backuplist")).Content.ReadAsStringAsync();
+        var responseBody = await (await Fetch(viewModel?.CurrentPreset.FileServer + "backuplist")).Content.ReadAsStringAsync();
         var stack = new Stack(responseBody.Split("\n"));
         stack.Pop();
         stack.Push("place");
@@ -222,11 +227,11 @@ public partial class MainWindow : Window
     private async void OnStartButtonPressed(object? sender, RoutedEventArgs e)
     {
         //Configure the current session's data
-        if (!ServerPresetViewModel.ServerPresetExists(MWVM.CurrentPreset)) ServerPresetViewModel.SaveServerPreset(MWVM.CurrentPreset);
+        if (!ServerPresetViewModel.ServerPresetExists(viewModel!.CurrentPreset)) ServerPresetViewModel.SaveServerPreset(viewModel.CurrentPreset);
         
         //UI and connections
-        await CreateConnection(MWVM.CurrentPreset.Websocket + MWVM.CurrentPreset.AdminKey);
-        Board.Board = await (await Fetch(MWVM.CurrentPreset.FileServer + "place")).Content.ReadAsByteArrayAsync();
+        await CreateConnection(viewModel.CurrentPreset.Websocket + viewModel.CurrentPreset.AdminKey);
+        Board.Board = await (await Fetch(viewModel.CurrentPreset.FileServer + "place")).Content.ReadAsByteArrayAsync();
         PlaceConfigPanel.IsVisible = false;
         DownloadBtn.IsEnabled = true;
 
@@ -236,14 +241,14 @@ public partial class MainWindow : Window
     }
 
     private void OnServerPresetsSelectionChanged(object? sender, SelectionChangedEventArgs args) =>
-        MWVM.CurrentPreset = SPVM.ServerPresets[ServerPresetListBox.SelectedIndex];
+        viewModel!.CurrentPreset = SPVM.ServerPresets[ServerPresetListBox.SelectedIndex];
 
     private void OnBackgroundMouseDown(object? sender, PointerPressedEventArgs e)
     {
         if (e.Source is null || !e.Source.Equals(CanvasBackground)) return; //stop bubbling
         mouseTravel = new Point(0, 0);
         mouseDown = true;
-        if (SelectTool.IsChecked is true) Board.StartSelection(MouseOverPixel(e), MouseOverPixel(e));
+        if (viewModel!.CurrentTool == Tool.Select) Board.StartSelection(MouseOverPixel(e), MouseOverPixel(e));
     }
 
     private void OnBackgroundMouseMove(object? sender, PointerEventArgs e)
@@ -267,7 +272,7 @@ public partial class MainWindow : Window
                 CursorIndicatorRectangle.Background = new SolidColorBrush(new Color(pxCol.Value.Alpha, pxCol.Value.Red, pxCol.Value.Green, pxCol.Value.Blue));
                 return;
             }
-            if (SelectTool.IsChecked is true)
+            if (viewModel?.CurrentTool == Tool.Select)
             {
                 Board.UpdateSelection(null, MouseOverPixel(e));
                 return;
@@ -281,7 +286,7 @@ public partial class MainWindow : Window
                     Width = Board.CanvasWidth ?? 500,
                     Height = Board.CanvasHeight ?? 500
                 };
-                SetPixels(px, MWVM.CurrentPaintBrushRadius);
+                SetPixels(px, viewModel.CurrentPaintBrushRadius);
                 //SetPixels(px, 20);
                 return;
             }
@@ -318,7 +323,7 @@ public partial class MainWindow : Window
             Height = Board.CanvasHeight ?? 500
         };
         //SetPixels(px, 50);
-        SetPixels(px, MWVM.CurrentPaintBrushRadius);
+        SetPixels(px, viewModel.CurrentPaintBrushRadius);
         
         PVM.CurrentColour = null;
     }
@@ -335,49 +340,38 @@ public partial class MainWindow : Window
     {
         if (CanvasDropdown is null) return;
         var backupName = CanvasDropdown.SelectedItem as string ?? "place";
-        PreviewImg.Source = await CreateCanvasPreviewImage(MWVM.CurrentPreset.FileServer + "backups/" + backupName);
+        PreviewImg.Source = await CreateCanvasPreviewImage(viewModel.CurrentPreset.FileServer + "backups/" + backupName);
         
-        //If we are viewing selected date only through the selection, then we are still technically on the pseudo-live canvas, viewselected only applies when we are on the live canvas
-        if (ViewSelectedDate.IsChecked is false)
+        if (ViewSelectedDate.IsChecked is true)
         {
-            Board.Board = await (await Fetch(MWVM.CurrentPreset.FileServer + "backups/" + backupName)).Content.ReadAsByteArrayAsync();
-            //If we are not looking at most recent backup, show a warning that we will not be able to modify it at all & disable tools.
-            //LiveCanvasWarning.IsVisible = CanvasDropdown.SelectedIndex != 0;
-            PaintbrushTool.IsEnabled = CanvasDropdown.SelectedIndex == 0;
-            RubberTool.IsEnabled = CanvasDropdown.SelectedIndex == 0;
-            SelectTool.IsEnabled = CanvasDropdown.SelectedIndex == 0;
+            //TODO: This is essentially same as OnViewSelectedDateClicked
+            Board.Board = await (await Fetch(viewModel.CurrentPreset.FileServer + "place")).Content.ReadAsByteArrayAsync();
+            Board.SelectionBoard = await (await Fetch(viewModel.CurrentPreset.FileServer + "backups/" + backupName)).Content.ReadAsByteArrayAsync();
+            viewModel.StateInfo = null;
         }
         else
         {
-            //TODO: This is essentially same as OnViewSelectedDateClicked
-            Board.Board = await (await Fetch(MWVM.CurrentPreset.FileServer + "place")).Content.ReadAsByteArrayAsync();
-            Board.SelectionBoard = await (await Fetch(MWVM.CurrentPreset.FileServer + "backups/" + backupName)).Content.ReadAsByteArrayAsync();
-            //LiveCanvasWarning.IsVisible = false;
-            PaintbrushTool.IsEnabled = true;
-            RubberTool.IsEnabled = true;
-            SelectTool.IsEnabled = true;
+            Board.Board = await (await Fetch(viewModel.CurrentPreset.FileServer + "backups/" + backupName)).Content.ReadAsByteArrayAsync();
+            Board.Changes = null;
+            Board.ClearSelections();
+            viewModel.StateInfo = CanvasDropdown.SelectedIndex != 0 ? App.Current.Services.GetRequiredService<LiveCanvasStateInfoViewModel>() : null;
         }
     }
     
     private async void OnViewSelectedDateChecked(object? sender, RoutedEventArgs e)
     {
-            Board.Board = await (await Fetch(MWVM.CurrentPreset.FileServer + "place")).Content.ReadAsByteArrayAsync();
+            Board.Board = await (await Fetch(viewModel.CurrentPreset.FileServer + "place")).Content.ReadAsByteArrayAsync();
             var backupName = CanvasDropdown.SelectedItem as string ?? "place";
-            Board.SelectionBoard = await (await Fetch(MWVM.CurrentPreset.FileServer + "backups/" + backupName)).Content.ReadAsByteArrayAsync();
-            //LiveCanvasWarning.IsVisible = false;
-            PaintbrushTool.IsEnabled = true;
-            RubberTool.IsEnabled = true;
-            SelectTool.IsEnabled = true;
+            Board.SelectionBoard = await (await Fetch(viewModel.CurrentPreset.FileServer + "backups/" + backupName)).Content.ReadAsByteArrayAsync();
+            viewModel.StateInfo = null;
     }
 
     private async void OnViewSelectedDateUnchecked(object? sender, RoutedEventArgs e)
     {
-        Board.Board = await (await Fetch(MWVM.CurrentPreset.FileServer + "backups/" + CanvasDropdown.SelectedItem)).Content.ReadAsByteArrayAsync();
-        //If we are not looking at most recent backup, show a warning that we will not be able to modify it at all & disable tools.
-        //LiveCanvasWarning.IsVisible = CanvasDropdown.SelectedIndex != 0;
-        PaintbrushTool.IsEnabled = CanvasDropdown.SelectedIndex == 0;
-        RubberTool.IsEnabled = CanvasDropdown.SelectedIndex == 0;
-        SelectTool.IsEnabled = CanvasDropdown.SelectedIndex == 0;
+        Board.Board = await (await Fetch(viewModel.CurrentPreset.FileServer + "backups/" + CanvasDropdown.SelectedItem)).Content.ReadAsByteArrayAsync();
+        Board.Changes = null;
+        Board.ClearSelections();
+        viewModel.StateInfo = CanvasDropdown.SelectedIndex != 0 ? App.Current.Services.GetRequiredService<LiveCanvasStateInfoViewModel>() : null;
     }
     
     private void OnResetCanvasViewPressed(object? _, RoutedEventArgs e)
@@ -397,7 +391,7 @@ public partial class MainWindow : Window
             "Download place file image to system"
         );
         if (path is null) return;
-        var placeImg = await CreateCanvasPreviewImage(MWVM.CurrentPreset.FileServer + "backups/" + CanvasDropdown.SelectedItem);
+        var placeImg = await CreateCanvasPreviewImage(viewModel.CurrentPreset.FileServer + "backups/" + CanvasDropdown.SelectedItem);
         placeImg?.Save(path);
     } 
 
@@ -421,7 +415,7 @@ public partial class MainWindow : Window
         }
 
         var radiusStack = new Stack<Pixel>();
-        if (MWVM.CurrentBrushShape == Shape.Square)
+        if (viewModel.CurrentBrushShape == Shape.Square)
         {
             var diameter = 2 * radius + 1;
             for (var i = 0; i < diameter; i++)
@@ -503,7 +497,7 @@ public partial class MainWindow : Window
             //If we are already viewing place update it
             if (CanvasDropdown.SelectedIndex == 0)
             {
-                Board.Board = await (await Fetch(MWVM.CurrentPreset.FileServer + "place")).Content.ReadAsByteArrayAsync();
+                Board.Board = await (await Fetch(viewModel.CurrentPreset.FileServer + "place")).Content.ReadAsByteArrayAsync();
             }
         }
     }
