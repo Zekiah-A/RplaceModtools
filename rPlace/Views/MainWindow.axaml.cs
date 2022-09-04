@@ -1,7 +1,9 @@
+using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections;
 using System.Diagnostics;
 using System.Net.WebSockets;
+using System.Runtime.InteropServices;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia;
@@ -169,13 +171,21 @@ public partial class MainWindow : Window
         await socket.Start();
     }
 
-    private void OnRollbackButtonPressed()
+    private void RollbackArea(int x, int y, int w, int h, byte[] rollbackBoard)
     {
-        //var buffer = new Uint8Array( w * h + 7 ), i = xxxx + yyyy * WIDTH//Object.assign(buffer, [99, w, h, i >> 24, i >> 16, i >> 8, i])
-        //foreach (var selection in Board.Selections)
-        //{
-        //    var stream = new MemoryStream((int) (selection.Tl.X - selection.Br.X) * (int) (selection.Tl.Y - selection.Br.Y) + 7);
-        //}
+        if (w > 250 || h > 250 || x >= Board.CanvasWidth || y >= Board.CanvasHeight) return;
+        var buffer = new byte[Board.CanvasWidth ?? 500 * Board.CanvasHeight ?? 500 + 7];
+        var i = x + y * Board.CanvasWidth ?? 500;
+        new byte[] {99, (byte) w, (byte) h, (byte) (i >> 24), (byte) (i >> 16), (byte) (i >> 8), (byte) i}.CopyTo(buffer, 0);
+        
+        for (var hi = 0; hi < h; hi++)
+        {
+            BinaryPrimitives.WriteInt32BigEndian(rollbackBoard.AsSpan().Slice(i, i + w),hi * w + 7);
+            rollbackBoard[i..(i + w)].CopyTo(buffer, hi * w + 7);
+            i += Board.CanvasWidth ?? 500;
+        }
+        
+        if (socket is {IsRunning: true}) socket.Send(buffer);
     }
 
     private async Task FetchCacheBackuplist()
@@ -484,6 +494,13 @@ public partial class MainWindow : Window
             }
         };
         process.Start();
+    }
+
+    private void OnRollbackButtonClicked(object? sender, RoutedEventArgs e)
+    {
+        if (Board.SelectionBoard is null) return;
+        var sel = Board.Selections.Peek();
+        RollbackArea((int) sel.Tl.X, (int) sel.Tl.Y, (int) sel.Br.X - (int) sel.Tl.X, (int) sel.Br.Y - (int) sel.Tl.Y, Board.SelectionBoard);
     }
 
     private async Task BackupCheckInterval()

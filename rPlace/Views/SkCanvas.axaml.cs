@@ -202,6 +202,7 @@ public partial class SkCanvas : UserControl
                     }
                 }
                 selectionCanvasCache = SKImage.FromBitmap(img);
+                selectionBoard = null;
                 img.Dispose();
             }
             if (selectionCanvasCache is not null) canvas.DrawImage(selectionCanvasCache, 0, 0);

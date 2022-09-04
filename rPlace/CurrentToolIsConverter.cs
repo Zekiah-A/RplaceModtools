@@ -22,8 +22,6 @@ public class CurrentToolIsConverter : IValueConverter
 
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        if (parameter is string param)
-            return Enum.Parse<Tool>(param);
-        throw new InvalidEnumArgumentException();
+        throw new NotImplementedException();
     }
 }

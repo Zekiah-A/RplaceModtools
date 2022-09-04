@@ -16,6 +16,7 @@ namespace rPlace
         public App()
         {
             Services = new ServiceCollection()
+                .AddSingleton<MainWindow>()
                 .AddTransient<MainWindowViewModel>()
                 .AddTransient<LiveCanvasStateInfoViewModel>()
                 .AddTransient<PaintBrushStateInfoViewModel>()
@@ -31,10 +32,7 @@ namespace rPlace
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                desktop.MainWindow = new MainWindow
-                {
-                    DataContext = new MainWindowViewModel(),
-                };
+                desktop.MainWindow = Current.Services.GetRequiredService<MainWindow>();
             }
 
             base.OnFrameworkInitializationCompleted();

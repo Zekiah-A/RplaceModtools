@@ -250,15 +250,34 @@
                     </Panel>
                     <TextBlock FontSize="18">Tool modes:</TextBlock>
                     <Grid Margin="5" RowDefinitions="*, *" ColumnDefinitions="*, *">
-                        <ToggleButton x:Name="PaintbrushTool" IsChecked="{Binding CurrentTool, Converter={StaticResource CurrentToolIsConverter}, ConverterParameter=PaintBrush}" IsEnabled="{Binding StateInfo, Converter={StaticResource StateInfoIsConverter}, ConverterParameter=LiveCanvasStateInfo}" Grid.Row="0" Grid.Column="0" HorizontalAlignment="Stretch" Margin="0 0 5 0"><ToolTip.Tip>Easily and quickly perform drawing operations upon the canvas.</ToolTip.Tip>Paintbrush</ToggleButton>
-                        <ToggleButton x:Name="RubberTool" IsChecked="{Binding CurrentTool, Converter={StaticResource CurrentToolIsConverter}, ConverterParameter=Rubber}" IsEnabled="{Binding StateInfo, Converter={StaticResource StateInfoIsConverter}, ConverterParameter=LiveCanvasStateInfo}" Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" Margin="5 0 0 0"><ToolTip.Tip>Erase areas of drawings with the paintbrush tool to the the canvas original state.</ToolTip.Tip>Rubber</ToggleButton>
-                        <ToggleButton x:Name="SelectTool" IsChecked="{Binding CurrentTool, Converter={StaticResource CurrentToolIsConverter}, ConverterParameter=Select}" IsEnabled="{Binding StateInfo, Converter={StaticResource StateInfoIsConverter}, ConverterParameter=LiveCanvasStateInfo}" Grid.Row="1" Grid.Column="0" HorizontalAlignment="Stretch" Margin="0 5 5 0"><ToolTip.Tip>Select an area of the canvas to view for rollback, or perform modifications on.</ToolTip.Tip>Select tool</ToggleButton>
-                        <ToggleButton x:Name="MacroTool" IsEnabled="False" Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" Margin="5 5 0 0"><ToolTip.Tip>Automate canvas moderation actions with small scripts.</ToolTip.Tip>Macro Execution</ToggleButton>
+                        <ToggleButton x:Name="PaintbrushTool"
+                                      IsEnabled="{Binding StateInfo, Converter={StaticResource StateInfoIsConverter}, ConverterParameter=LiveCanvasStateInfo}"
+                                       Grid.Row="0" Grid.Column="0" HorizontalAlignment="Stretch" Margin="0 0 5 0">
+                            <ToolTip.Tip>Easily and quickly perform drawing operations upon the canvas.</ToolTip.Tip>Paintbrush
+                        </ToggleButton>
+                        <ToggleButton x:Name="RubberTool"
+                                      IsEnabled="{Binding StateInfo, Converter={StaticResource StateInfoIsConverter}, ConverterParameter=LiveCanvasStateInfo}"
+                                      Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" Margin="5 0 0 0">
+                            <ToolTip.Tip>Erase areas of drawings with the paintbrush tool to the the canvas original state.</ToolTip.Tip>Rubber
+                        </ToggleButton>
+                        <ToggleButton x:Name="SelectTool"
+                                      IsEnabled="{Binding StateInfo, Converter={StaticResource StateInfoIsConverter}, ConverterParameter=LiveCanvasStateInfo}"
+                                      Grid.Row="1" Grid.Column="0" HorizontalAlignment="Stretch" Margin="0 5 5 0">
+                            <ToolTip.Tip>Select an area of the canvas to view for rollback, or perform modifications on.</ToolTip.Tip>Select tool
+                        </ToggleButton>
+                        <ToggleButton x:Name="MacroTool" IsEnabled="False" Grid.Row="1" Grid.Column="1"
+                                      HorizontalAlignment="Stretch" Margin="5 5 0 0">
+                            <ToolTip.Tip>Automate canvas moderation actions with small scripts.</ToolTip.Tip>Macro Execution
+                        </ToggleButton>
                     </Grid>
                     <ToggleSwitch x:Name="ViewSelectedDate" Margin="5" Checked="OnViewSelectedDateChecked" Unchecked="OnViewSelectedDateUnchecked"><ToolTip.Tip>By turning this on, instead of viewing the whole canvas as the backup, only the area within your selection would peek through to the backup, allowing for easier visualisations of your rollback.</ToolTip.Tip>View selected area at canvas date</ToggleSwitch>
                     <Grid ColumnDefinitions="* Auto">
-                        <Button Grid.Column="0" Margin="5" HorizontalAlignment="Stretch"><ToolTip.Tip>Revert the selected area of the canvas to a previous date.</ToolTip.Tip>Rollback selected area</Button>
-                        <Button Grid.Column="1" Margin="5" HorizontalAlignment="Stretch"><ToolTip.Tip>Load a place file from your local device for rollback (not yet implemented).</ToolTip.Tip>📂</Button>
+                        <Button Grid.Column="0" Margin="5" HorizontalAlignment="Stretch">
+                            <ToolTip.Tip>Revert the selected area of the canvas to a previous date.</ToolTip.Tip>Rollback selected area
+                        </Button>
+                        <Button Grid.Column="1" Margin="5" HorizontalAlignment="Stretch">
+                            <ToolTip.Tip>Load a place file from your local device for rollback (not yet implemented).</ToolTip.Tip>📂
+                        </Button>
                     </Grid>
                 </StackPanel>
             </ScrollViewer>
