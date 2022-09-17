@@ -296,7 +296,7 @@ public partial class MainWindow : Window
                     Width = Board.CanvasWidth ?? 500,
                     Height = Board.CanvasHeight ?? 500
                 };
-                SetPixels(px, viewModel.CurrentPaintBrushRadius);
+                SetPixels(px, viewModel!.CurrentPaintBrushRadius);
                 //SetPixels(px, 20);
                 return;
             }
