@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia;
+using Avalonia.Controls.Primitives;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -65,6 +66,10 @@ public partial class MainWindow : Window
         DataContext = viewModel;
         
         InitializeComponent();
+        
+        // Setting it from XAML causes the event to be fired before other controls get initialized which throws a NRE.
+        PaintTool.IsChecked = true;
+        
         CanvasBackground.AddHandler(PointerPressedEvent, OnBackgroundMouseDown, handledEventsToo: false);
         CanvasBackground.AddHandler(PointerMovedEvent, OnBackgroundMouseMove, handledEventsToo: false);
         CanvasBackground.AddHandler(PointerReleasedEvent, OnBackgroundMouseRelease, handledEventsToo: false);
@@ -515,6 +520,37 @@ public partial class MainWindow : Window
             if (CanvasDropdown.SelectedIndex == 0)
             {
                 Board.Board = await (await Fetch(viewModel.CurrentPreset.FileServer + "place")).Content.ReadAsByteArrayAsync();
+            }
+        }
+    }
+
+    private void ToolToggleButtonCheck(object? sender, RoutedEventArgs e)
+    {
+        ArgumentNullException.ThrowIfNull(sender);
+        
+        var toggleButton = (ToggleButton) sender;
+        
+        switch (toggleButton.Name)
+        {
+            case "PaintTool":
+            {
+                RubberTool.IsChecked = false;
+                SelectTool.IsChecked = false;
+                break;
+            }
+                
+            case "RubberTool":
+            {
+                PaintTool.IsChecked = false;
+                SelectTool.IsChecked = false;
+                break;
+            }
+
+            case "SelectTool":
+            {
+                RubberTool.IsChecked = false;
+                PaintTool.IsChecked = false;
+                break;
             }
         }
     }

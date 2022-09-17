@@ -250,18 +250,15 @@
                     </Panel>
                     <TextBlock FontSize="18">Tool modes:</TextBlock>
                     <Grid Margin="5" RowDefinitions="*, *" ColumnDefinitions="*, *">
-                        <ToggleButton x:Name="PaintbrushTool"
-                                      IsEnabled="{Binding StateInfo, Converter={StaticResource StateInfoIsConverter}, ConverterParameter=LiveCanvasStateInfo}"
-                                       Grid.Row="0" Grid.Column="0" HorizontalAlignment="Stretch" Margin="0 0 5 0">
+                        <ToggleButton x:Name="PaintTool" Command="{Binding SelectPaintToolCommand}" Checked="ToolToggleButtonCheck"
+                                      Grid.Row="0" Grid.Column="0" HorizontalAlignment="Stretch" Margin="0 0 5 0">
                             <ToolTip.Tip>Easily and quickly perform drawing operations upon the canvas.</ToolTip.Tip>Paintbrush
                         </ToggleButton>
-                        <ToggleButton x:Name="RubberTool"
-                                      IsEnabled="{Binding StateInfo, Converter={StaticResource StateInfoIsConverter}, ConverterParameter=LiveCanvasStateInfo}"
+                        <ToggleButton x:Name="RubberTool" Command="{Binding SelectRubberToolCommand}" Checked="ToolToggleButtonCheck"
                                       Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" Margin="5 0 0 0">
                             <ToolTip.Tip>Erase areas of drawings with the paintbrush tool to the the canvas original state.</ToolTip.Tip>Rubber
                         </ToggleButton>
-                        <ToggleButton x:Name="SelectTool"
-                                      IsEnabled="{Binding StateInfo, Converter={StaticResource StateInfoIsConverter}, ConverterParameter=LiveCanvasStateInfo}"
+                        <ToggleButton x:Name="SelectTool" Command="{Binding SelectSelectionToolCommand}" Checked="ToolToggleButtonCheck"
                                       Grid.Row="1" Grid.Column="0" HorizontalAlignment="Stretch" Margin="0 5 5 0">
                             <ToolTip.Tip>Select an area of the canvas to view for rollback, or perform modifications on.</ToolTip.Tip>Select tool
                         </ToggleButton>
