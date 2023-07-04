@@ -18,6 +18,7 @@ using rPlace.Models;
 using SkiaSharp;
 using rPlace.ViewModels;
 using Websocket.Client;
+using System.Timers;
 
 namespace rPlace.Views;
 public partial class MainWindow : Window
@@ -47,6 +48,7 @@ public partial class MainWindow : Window
             );
             return lookingAtPixel;
         }
+
         set
         {
             lookingAtPixel = value;
@@ -122,6 +124,7 @@ public partial class MainWindow : Window
         }
         return changes;
     }
+    // TODO: Implement BoardPacker/BoardUnpacker submodule library
 
     private async Task CreateConnection(string uri)
     {
@@ -137,7 +140,11 @@ public partial class MainWindow : Window
         socket = new WebsocketClient(new Uri(uri), factory);
         socket.ReconnectTimeout = TimeSpan.FromSeconds(10);
         
-        socket.ReconnectionHappened.Subscribe(info => Console.WriteLine("Reconnected to {0}, {1}", uri, info.Type));
+        socket.ReconnectionHappened.Subscribe(info =>
+        {
+            Console.WriteLine("Reconnected to {0}, {1}", uri, info.Type))
+        };
+
         socket.MessageReceived.Subscribe(msg =>
         {
             var code = msg.Binary[0];
@@ -211,7 +218,11 @@ public partial class MainWindow : Window
             response.EnsureSuccessStatusCode();
             return response;
         }
-        catch (HttpRequestException e) { Console.WriteLine(e); }
+        catch (HttpRequestException e)
+        {
+            Console.WriteLine(e);
+        }
+        
         return new HttpResponseMessage();
     }
 
@@ -252,7 +263,8 @@ public partial class MainWindow : Window
 
         //Backup loading
         await FetchCacheBackuplist();
-        CanvasDropdown.SelectedIndex = 0; //BackupCheckInterval()
+        CanvasDropdown.SelectedIndex = 0;
+        BackupCheckInterval()
     }
 
     private void OnServerPresetsSelectionChanged(object? sender, SelectionChangedEventArgs args) =>
@@ -468,7 +480,7 @@ public partial class MainWindow : Window
         {
             while (radiusStack.Count != 0)
             {
-                Thread.Sleep(30);
+                Task.Delay(30);
                 if (socket is {IsRunning: true}) socket.Send(radiusStack.Pop().ToByteArray());
             }
         });
@@ -508,20 +520,26 @@ public partial class MainWindow : Window
         RollbackArea((int) sel.Tl.X, (int) sel.Tl.Y, (int) sel.Br.X - (int) sel.Tl.X, (int) sel.Br.Y - (int) sel.Tl.Y, Board.SelectionBoard);
     }
 
-    private async Task BackupCheckInterval()
+    private void BackupCheckInterval()
     {
-
-        //Wait 15 mins before checking again, TODO: Make this configurable with toggle backup check interval
-        while (true)
+        var timer = new Timer
         {
-            Thread.Sleep(900000);
+            AutoReset = true,
+            Interval = TimeSpan.FromMinutes(2)
+        };
+
+        timer.Elapsed += async (_, _) =>
+        {
+            Task.Delay(900000); // 
             await FetchCacheBackuplist();
             //If we are already viewing place update it
             if (CanvasDropdown.SelectedIndex == 0)
             {
                 Board.Board = await (await Fetch(viewModel.CurrentPreset.FileServer + "place")).Content.ReadAsByteArrayAsync();
             }
-        }
+        };
+
+        timer.Start();
     }
 
     private void ToolToggleButtonCheck(object? sender, RoutedEventArgs e)
@@ -533,25 +551,20 @@ public partial class MainWindow : Window
         switch (toggleButton.Name)
         {
             case "PaintTool":
-            {
+            
                 RubberTool.IsChecked = false;
                 SelectTool.IsChecked = false;
                 break;
-            }
-                
             case "RubberTool":
-            {
+            
                 PaintTool.IsChecked = false;
                 SelectTool.IsChecked = false;
                 break;
-            }
-
             case "SelectTool":
-            {
+            
                 RubberTool.IsChecked = false;
                 PaintTool.IsChecked = false;
                 break;
-            }
         }
     }
 }

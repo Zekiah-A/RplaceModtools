@@ -23,8 +23,6 @@ public partial class SkCanvas : UserControl
     
     private static byte[]? board;
     private static byte[]? changes;
-    private static bool boardCached;
-    private static bool changesCached;
     private static SKImage? boardCache;
     private static SKImage? changesCache;
 
@@ -33,9 +31,6 @@ public partial class SkCanvas : UserControl
     private static SKImage? selectionCanvasCache;
     private static float canvZoom = 1;
     private static SKPoint canvPosition = SKPoint.Empty;
-    private static SKColor? pixelAtColour;
-    private static Vector2? pixelAtPosition;
-    private static Stopwatch? stopwatch;
     private static List<SKPaint> paints = new();
 
     public byte[]? Board
@@ -44,7 +39,6 @@ public partial class SkCanvas : UserControl
         set
         {
             board = value;
-            boardCached = false;
             Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
         }
     }
@@ -55,7 +49,6 @@ public partial class SkCanvas : UserControl
         set
         {
             changes = value;
-            changesCached = false;
             Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
         }
     }
@@ -130,7 +123,10 @@ public partial class SkCanvas : UserControl
         {
             //Console.WriteLine("Drawing " + DateTime.Now + " " + Thread.GetCurrentProcessorId());
             var canvas = (context as ISkiaDrawingContextImpl)?.SkCanvas;
-            if (canvas == null) throw new Exception("[Fatal] Render Error: SkCanvas was null, perhaps not using skia as render backend?");
+            if (canvas == null)
+            {
+                throw new Exception("[Fatal] Render Error: SkCanvas was null, perhaps not using skia as render backend?");
+            }
             canvas.Save();
             
             //These must happen first because apparently it just works that way, idk.
@@ -138,31 +134,30 @@ public partial class SkCanvas : UserControl
             canvas.Translate(canvPosition.X, canvPosition.Y);
 
             //Equivalent of renderAll
-            if (!boardCached && board is not null)
+            if (boardCache is null && board is not null)
             {
                 using var img = new SKBitmap(ParentSk.CanvasWidth ?? 500, ParentSk.CanvasHeight ?? 500, true);
                 for (var i = 0; i < board.Length; i++)
+                {
                     img.SetPixel(i % ParentSk.CanvasWidth ?? 500, i / ParentSk.CanvasWidth ?? 500, PaletteViewModel.Colours[board[i]]);
+                }
+
                 boardCache = SKImage.FromBitmap(img);
-                img.Dispose();
-                boardCached = true;
             }
-            if (!changesCached && changes is not null)
+            if (changesCache is null && changes is not null)
             {
                 using var img = new SKBitmap(ParentSk.CanvasWidth ?? 500, ParentSk.CanvasHeight ?? 500, true);
                 for (var i = 0; i < changes.Length; i++)
+                {
                     img.SetPixel(i % ParentSk.CanvasWidth ?? 500, i / ParentSk.CanvasWidth ?? 500, PaletteViewModel.Colours[changes[i]]);
+                }
+                
                 changesCache = SKImage.FromBitmap(img);
-                img.Dispose();
-                changesCached = true;
             }
             
-            if (changesCached && changesCache is not null)
+            if (changesCache is not null && boardCache is not null)
             {
                 canvas.DrawImage(changesCache, 0, 0);
-            }
-            if (boardCached && boardCache is not null)
-            {
                 canvas.DrawImage(boardCache, 0, 0);
             }
             else
@@ -177,7 +172,6 @@ public partial class SkCanvas : UserControl
                 canvas.DrawRect(354, 144, 70, 280, frg); //right
                 canvas.DrawRect(214, 354, 140, 70, frg); //bottom
                 canvas.DrawRect(214, 214, 72, 72, dot); //centre
-
             }
             
             //Draw all pixels that have come in to the canvas.
@@ -205,7 +199,10 @@ public partial class SkCanvas : UserControl
                 selectionBoard = null;
                 img.Dispose();
             }
-            if (selectionCanvasCache is not null) canvas.DrawImage(selectionCanvasCache, 0, 0);
+            if (selectionCanvasCache is not null)
+            {
+                canvas.DrawImage(selectionCanvasCache, 0, 0);
+            }
             
             //Draw selections
             foreach (var sel in ParentSk.Selections)
@@ -215,22 +212,6 @@ public partial class SkCanvas : UserControl
                 canvas.DrawRect((float) Math.Floor(sel.Tl.X), (float) Math.Floor(sel.Tl.Y), (float) Math.Floor(sel.Br.X), (float) Math.Floor(sel.Br.Y), sKBrush);
             }
             
-            //Get pixel colour at screen co-ordinate, to return to ColourAt
-            if (pixelAtPosition is not null)
-            {
-                var dstinf = new SKImageInfo
-                {
-                    ColorType = SKColorType.Rgb888x,
-                    AlphaType = SKAlphaType.Opaque,
-                    Width = 1,
-                    Height = 1
-                };
-                var bitmap = new SKBitmap(dstinf);
-                var dstpixels = bitmap.GetPixels();
-                (context as ISkiaDrawingContextImpl)?.SkSurface.ReadPixels(dstinf, dstpixels, dstinf.RowBytes, (int) pixelAtPosition.Value.X, (int) pixelAtPosition.Value.Y);
-                pixelAtColour = bitmap.GetPixel(0, 0);
-                pixelAtPosition = null;
-            }
             canvas.Flush();
             canvas.Restore();
         }
@@ -270,15 +251,10 @@ public partial class SkCanvas : UserControl
         Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
     }
     
+    // TODO: This method was so egrigiously bad that it should just be changed to a view vcalculation
     public SKColor? ColourAt(int x, int y)
     {
-        //Limit the amount of times we re-render to get the colour to 60fps framerate.
-        if (stopwatch is null) { stopwatch = new(); stopwatch.Start(); return null; } 
-        if (stopwatch.ElapsedMilliseconds < 16) return null;
-        pixelAtPosition = new Vector2(x, y);
-        VisualRoot?.Renderer.AddDirty(this);
-        stopwatch.Restart();
-        return pixelAtColour;
+        return null;
     }
 
     public void Set(Pixel pixel)

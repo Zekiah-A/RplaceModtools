@@ -16,7 +16,7 @@ public partial class ServerPresetViewModel : ObservableObject
             var enumerable = lines as string[] ?? lines.ToArray();
             for (var i = 0; i < enumerable.Length; i += 3)
             {
-                var set = enumerable[i..(i+3)];
+                var set = enumerable[i..(i + 3)];
                 presets.Add(new ServerPreset
                 {
                     Websocket = set[0],
