@@ -76,6 +76,7 @@ public partial class MainWindow : Window
         CanvasBackground.AddHandler(PointerMovedEvent, OnBackgroundMouseMove, handledEventsToo: false);
         CanvasBackground.AddHandler(PointerReleasedEvent, OnBackgroundMouseRelease, handledEventsToo: false);
         CanvasBackground.PointerWheelChanged += OnBackgroundWheelChanged;
+        
         var windowSize = this.GetObservable(ClientSizeProperty);
         windowSize.Subscribe(size =>
         {
