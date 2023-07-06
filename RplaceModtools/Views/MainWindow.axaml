@@ -1,0 +1,320 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:RplaceModtools.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:views="clr-namespace:RplaceModtools.Views"
+        xmlns:rPlace="clr-namespace:RplaceModtools"
+        mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="600" MinWidth="400"
+        x:Class="RplaceModtools.Views.MainWindow"
+        Icon="/Assets/favicon.ico"
+        Title="RplaceModtools"
+        TransparencyLevelHint="AcrylicBlur"
+        Background="Transparent">
+    
+    <Window.Styles>
+        <Style Selector="Image.PlaceLogo">
+            <Setter Property="Height" Value="100"/>
+            <Setter Property="Width" Value="100"/>
+            <Style.Animations>
+                <Animation Delay="0:0:1" Duration="0:0:1" Easing="QuadraticEaseOut"> 
+                    <KeyFrame Cue="0%">
+                        <Setter Property="Height" Value="140"></Setter>
+                        <Setter Property="Opacity" Value="0.0"/>
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="Height" Value="100"></Setter>
+                        <Setter Property="Opacity" Value="1.0"/>
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+        <Style Selector="Label.PlaceTitle">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="FontSize" Value="18"/>
+            <Style.Animations>
+                <Animation Delay="0:0:2" Duration="0:0:1.5" Easing="QuadraticEaseOut"> 
+                    <KeyFrame Cue="0%">
+                        <Setter Property="Opacity" Value="0.0"/>
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="Opacity" Value="1.0"/>
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+        <Style Selector="StackPanel.PlaceConfig">
+            <Style.Animations>
+                <Animation Delay="0:0:2" Duration="0:0:1.5" Easing="QuadraticEaseOut"> 
+                    <KeyFrame Cue="0%">
+                        <Setter Property="Opacity" Value="0.0"/>
+                        <Setter Property="Spacing" Value="20"></Setter>
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="Opacity" Value="1.0"/>
+                        <Setter Property="Spacing" Value="0"></Setter>
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+        <!-- TODO: Should use transition instead -->
+        <Style Selector="Border.ToolsPanelOpen">
+            <Style.Animations>
+                <Animation Duration="0:0:0.5" Easing="QuadraticEaseOut" FillMode="Forward"> 
+                    <KeyFrame Cue="0%"><Setter Property="Margin" Value="0"/></KeyFrame>
+                    <KeyFrame Cue="100%"><Setter Property="Margin" Value="0 0 -500 0"/></KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+        <Style Selector="Border.ToolsPanelClose">
+            <Style.Animations>
+                <Animation Duration="0:0:0.5" Easing="QuadraticEaseOut" FillMode="Forward"> 
+                    <KeyFrame Cue="0%"><Setter Property="Margin" Value="0 0 -500 0"/> </KeyFrame>
+                    <KeyFrame Cue="100%"><Setter Property="Margin" Value="0"/></KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+        <!--Palette colour select panel styles-->
+        <Style Selector="Border.DoneButton">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#FF5500"/>
+            <Setter Property="BorderThickness" Value="4"/>
+            <Setter Property="CornerRadius" Value="36"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0 0 0 8"/>
+            <Setter Property="Width" Value="180"/>
+        </Style>
+        <Style Selector="Border.PaletteColour">
+            <Setter Property="Width" Value="50"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="BorderBrush" Value="LightGray"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Margin" Value="2"/>
+        </Style>
+        <Style Selector="Border.PaletteColour:pointerover">
+            <Setter Property="BoxShadow" Value="inset 50 0 0 0 White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+    </Window.Styles>
+
+    <Window.Resources>
+        <rPlace:NumericSignConverter x:Key="NumericSignConverter"/>
+        <rPlace:StateInfoIsConverter x:Key="StateInfoIsConverter"/>
+        <rPlace:CurrentToolIsConverter x:Key="CurrentToolIsConverter"/>
+    </Window.Resources>
+    
+    <Design.DataContext>
+       <vm:MainWindowViewModel/>
+    </Design.DataContext>
+    
+    <Grid ColumnDefinitions="*, Auto" x:Name="MainGrid">
+        <Border Grid.Column="0" Grid.ColumnSpan="2" x:Name="PlaceConfigPanel" HorizontalAlignment="Center" VerticalAlignment="Center" Width="380" Height="508" Background="White" BoxShadow="0 0 20 2 Gray" CornerRadius="10" ZIndex="8">
+            <Grid RowDefinitions="*, Auto">
+                <StackPanel Grid.Row="0">
+                    <Image Classes="PlaceLogo" Source="../Assets/favicon.png"/>
+                    <Label Classes="PlaceTitle">RplaceTK Mod Tools - ©Zekiah-A</Label>
+                    <StackPanel Classes="PlaceConfig" Margin="10">
+                        <TextBlock FontSize="24" Margin="0 0 0 5">Configuration:</TextBlock>
+                        <AutoCompleteBox x:Name="ConfigWsInput" Watermark="Canvas websocket address" Items="{Binding KnownWebsockets}" Text="{Binding CurrentPreset.Websocket}" Margin="0 0 0 5"/>
+                        <AutoCompleteBox x:Name="ConfigFsInput" Watermark="Place file server address" Items="{Binding KnownFileServers}" Text="{Binding CurrentPreset.FileServer}" Margin="0 0 0 5"/>
+                        <TextBlock FontSize="18" Margin="0 0 0 5">Client:</TextBlock>
+                        <TextBox x:Name="ConfigAdminKeyInput" Watermark="Admin key" Text="{Binding CurrentPreset.AdminKey}" Margin="0 0 0 5"/>
+                        <ScrollViewer>
+                            <ListBox x:Name="ServerPresetListBox" Items="{Binding ServerPresets}" SelectionChanged="OnServerPresetsSelectionChanged">
+                                <ListBox.DataContext><vm:ServerPresetViewModel/></ListBox.DataContext>
+                                <ListBox.Styles>
+                                    <Style Selector="ListBox">
+                                        <Setter Property="Background" Value="Transparent"></Setter>
+                                    </Style>
+                                    <Style Selector="ListBoxItem">
+                                        <Style.Animations>
+                                            <Animation Delay="0:0:3" Duration="0:0:2" Easing="QuadraticEaseOut"> 
+                                                <KeyFrame Cue="0%">
+                                                    <Setter Property="Opacity" Value="0.0"/>
+                                                </KeyFrame>
+                                                <KeyFrame Cue="100%">
+                                                    <Setter Property="Opacity" Value="1.0"/>
+                                                </KeyFrame>
+                                            </Animation>
+                                        </Style.Animations>
+                                        <Setter Property="Padding" Value="4" />
+                                        <Setter Property="MinWidth" Value="72"/>
+                                        <Setter Property="MinHeight" Value="72"/>
+                                        <Setter Property="Margin" Value="2"/>
+                                        <Setter Property="CornerRadius" Value="4"/>
+                                        <Setter Property="Background" Value="{DynamicResource ButtonBackground}"/>
+                                    </Style>
+                                    <Style Selector="TextBlock.ServerPresetHeader">
+                                        <Setter Property="FontSize" Value="36" />
+                                        <Setter Property="TextAlignment" Value="Center" />
+                                        <Setter Property="Canvas.Left" Value="0" />
+                                    </Style>
+                                    <Style Selector="TextBlock.ServerPresetHeader:pointerover">
+                                        <Setter Property="Canvas.Left" Value="{Binding RelativeSource={RelativeSource Self}, Path=DesiredSize.Width, Converter={StaticResource NumericSignConverter}}" />
+                                    </Style>
+                                </ListBox.Styles>
+                                <ListBox.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Rows="2" Columns="4" />
+                                    </ItemsPanelTemplate>
+                                </ListBox.ItemsPanel>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel>
+                                            <Canvas>
+                                                <TextBlock Classes="ServerPresetHeader" Text="{Binding Websocket}">
+                                                    <TextBlock.Transitions>
+                                                        <Transitions>
+                                                            <DoubleTransition Property="Canvas.Left" Duration="0:0:6"/>
+                                                        </Transitions>
+                                                    </TextBlock.Transitions>
+                                                </TextBlock>
+                                            </Canvas>
+                                            <TextBlock Padding="0 36 0 0" Text="{Binding AdminKey}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </ScrollViewer>
+                    </StackPanel>
+                </StackPanel>
+                <Button Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Bottom" CornerRadius="5" Padding="40 10 40 10" Margin="5" Click="OnStartButtonPressed">Start</Button>
+            </Grid>
+        </Border>
+
+        <Panel Grid.Column="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="White" Opacity="0.8" x:Name="CanvasBackground">
+            <views:SkCanvas x:Name="Board"/>
+            
+            <Canvas VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+                <Border x:Name="CursorIndicatorRectangle" IsVisible="False" BorderBrush="Gray" CornerRadius="2" BorderThickness="1" Background="Transparent" Height="16" Width="16" Opacity="1"/>
+            </Canvas>
+            
+            <Border x:Name="ToolsInformation" IsVisible="{Binding StateInfo, Converter={x:Static ObjectConverters.IsNotNull}}" VerticalAlignment="Top" HorizontalAlignment="Right" BorderThickness="2" CornerRadius="8" Margin="16" Padding="8">
+                <Border.Background>
+                    <SolidColorBrush Color="Gray" Opacity="0.5" />
+                </Border.Background>
+                <TransitioningContentControl Content="{Binding StateInfo}">
+                    <TransitioningContentControl.PageTransition>
+                        <PageSlide Duration="0.1" />
+                    </TransitioningContentControl.PageTransition>
+                </TransitioningContentControl>
+            </Border>
+            
+            <Button ZIndex="3" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="10" Padding="10" Click="OnSelectColourClicked">Select Colour</Button>
+            <DockPanel ZIndex="8" Dock="Bottom" Height="150" VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Background="White" IsVisible="False" x:Name="Palette">
+                <Grid RowDefinitions="* Auto">
+                    <ScrollViewer Grid.Row="0">
+                        <ListBox x:Name="PaletteListBox" Items="{Binding AvColours}" HorizontalAlignment="Stretch" VerticalAlignment="Top" SelectionChanged="OnPaletteSelectionChanged" SelectedIndex="{Binding CurrentColour}" Background="Transparent">
+                            <ListBox.DataContext><vm:PaletteViewModel/></ListBox.DataContext>
+                            <ListBox.Styles>
+                                <Style Selector="ListBoxItem">
+                                    <Setter Property="Padding" Value="0" />
+                                </Style>
+                            </ListBox.Styles>
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate> 
+                                    <WrapPanel x:Name="PalettePanel" Orientation="Horizontal" Margin="10 16 10 0"/>
+                                </ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Classes="PaletteColour" Background="{Binding}"/>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </ScrollViewer>
+                    <Border Grid.Row="1" Classes="DoneButton">
+                        <Button Padding="8" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" CornerRadius="36" Background="Transparent" Click="OnPaletteDoneButtonClicked">Done</Button>
+                    </Border>
+                </Grid>
+            </DockPanel>
+        </Panel>
+        <Border Grid.Column="1" x:Name="ToolsPanel" BorderBrush="Black" Padding="10" BoxShadow="0 0 10 2 Gray" Width="300" Background="White">
+            <ScrollViewer>
+                <StackPanel>
+                    <TextBlock FontSize="24">Tools:</TextBlock>
+                    <TextBlock FontSize="18">Canvas:</TextBlock>
+                    <AutoCompleteBox Margin="5" Watermark="Switch canvas/server" Items="{Binding KnownWebsockets}" IsEnabled="False"/>
+                    <ComboBox Margin="5" SelectedIndex="0" x:Name="CanvasDropdown" VirtualizationMode="Simple" SelectionChanged="OnCanvasDropdownSelectionChanged">
+                        <ToolTip.Tip>Select a previous backup of the canvas for viewing and rollback.</ToolTip.Tip>
+                        <ComboBoxItem>place</ComboBoxItem>
+                    </ComboBox>
+                    <Panel Margin="5 0 5 0">
+                        <Image x:Name="PreviewImg" Source="../Assets/preview_default.png" RenderOptions.BitmapInterpolationMode="Default"/>
+                            <Grid ColumnDefinitions="Auto, Auto, *" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Background="White">
+                                <Button Grid.Column="0" Margin="4" IsEnabled="False">Prev</Button>
+                                <Button Grid.Column="1" Margin="4" IsEnabled="False">Next</Button>
+                                <Button Grid.Column="2" x:Name="DownloadBtn" IsEnabled="False" HorizontalAlignment="Right" Margin="4" Click="OnDownloadPreviewPressed">Download</Button>
+                            </Grid>
+                    </Panel>
+                    <TextBlock FontSize="18">Tool modes:</TextBlock>
+                    <Grid Margin="5" RowDefinitions="*, *" ColumnDefinitions="*, *">
+                        <ToggleButton x:Name="PaintTool" Command="{Binding SelectPaintToolCommand}" Checked="ToolToggleButtonCheck"
+                                      Grid.Row="0" Grid.Column="0" HorizontalAlignment="Stretch" Margin="0 0 5 0">
+                            <ToolTip.Tip>Easily and quickly perform drawing operations upon the canvas.</ToolTip.Tip>Paintbrush
+                        </ToggleButton>
+                        <ToggleButton x:Name="RubberTool" Command="{Binding SelectRubberToolCommand}" Checked="ToolToggleButtonCheck"
+                                      Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" Margin="5 0 0 0">
+                            <ToolTip.Tip>Erase areas of drawings with the paintbrush tool to the the canvas original state.</ToolTip.Tip>Rubber
+                        </ToggleButton>
+                        <ToggleButton x:Name="SelectTool" Command="{Binding SelectSelectionToolCommand}" Checked="ToolToggleButtonCheck"
+                                      Grid.Row="1" Grid.Column="0" HorizontalAlignment="Stretch" Margin="0 5 5 0">
+                            <ToolTip.Tip>Select an area of the canvas to view for rollback, or perform modifications on.</ToolTip.Tip>Select tool
+                        </ToggleButton>
+                        <ToggleButton x:Name="MacroTool" IsEnabled="False" Grid.Row="1" Grid.Column="1"
+                                      HorizontalAlignment="Stretch" Margin="5 5 0 0">
+                            <ToolTip.Tip>Automate canvas moderation actions with small scripts.</ToolTip.Tip>Macro Execution
+                        </ToggleButton>
+                    </Grid>
+                    <ToggleSwitch x:Name="ViewSelectedDate" Margin="5" Checked="OnViewSelectedDateChecked" Unchecked="OnViewSelectedDateUnchecked"><ToolTip.Tip>By turning this on, instead of viewing the whole canvas as the backup, only the area within your selection would peek through to the backup, allowing for easier visualisations of your rollback.</ToolTip.Tip>View selected area at canvas date</ToggleSwitch>
+                    <Grid ColumnDefinitions="* Auto">
+                        <Button Grid.Column="0" Margin="5" HorizontalAlignment="Stretch">
+                            <ToolTip.Tip>Revert the selected area of the canvas to a previous date.</ToolTip.Tip>Rollback selected area
+                        </Button>
+                        <Button Grid.Column="1" Margin="5" HorizontalAlignment="Stretch">
+                            <ToolTip.Tip>Load a place file from your local device for rollback (not yet implemented).</ToolTip.Tip>📂
+                        </Button>
+                    </Grid>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+        <Canvas Grid.Column="0">
+            <Button Canvas.Top="10" Canvas.Left="10" FontSize="16" Content="...">
+                <Button.Flyout>
+                    <MenuFlyout Placement="Bottom">
+                        <MenuItem Header="Settings">
+                            <MenuItem Header="Enable cache place files" IsEnabled="False"/>
+                            <MenuItem Header="Toggle dark mode" Click="OnToggleThemePressed"/>
+                            <MenuItem Header="Toggle backup check interval" IsEnabled="False"/>
+                            <MenuItem Header="Reset canvas view" Click="OnResetCanvasViewPressed"/>
+                        </MenuItem>
+                        <MenuItem Header="See application logs" IsEnabled="False"/>
+                        <MenuItem Header="Check for updates" IsEnabled="False"/>
+                        <MenuItem Header="About">
+                            <TextBlock>
+                                    Rplace modtools 
+                                    Copyright (C) 2023 Zekiah-A
+
+                                    This program is free software: you can redistribute it and/or modify
+                                    it under the terms of the GNU General Public License as published by
+                                    the Free Software Foundation, either version 3 of the License, or
+                                    (at your option) any later version.
+
+                                    This program is distributed in the hope that it will be useful,
+                                    but WITHOUT ANY WARRANTY; without even the implied warranty of
+                                    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+                                    GNU General Public License for more details.
+
+                                    You should have received a copy of the GNU General Public License
+                                    along with this program.  If not, see &lt;https://www.gnu.org/licenses/&gt;
+                            </TextBlock>
+                            <MenuItem Header="..ps: thanks Starlk for teaching me how to Avalonia."/>
+                        </MenuItem>
+                        <MenuItem Header="Github" Click="OnOpenGithubClicked"/>
+                    </MenuFlyout>
+                </Button.Flyout>
+            </Button>
+        </Canvas>
+    </Grid>
+</Window>
