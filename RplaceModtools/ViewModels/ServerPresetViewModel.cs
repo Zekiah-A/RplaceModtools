@@ -7,38 +7,53 @@ namespace RplaceModtools.ViewModels;
 
 public partial class ServerPresetViewModel : ObservableObject
 {
-    private static readonly string presetPath = 
-        Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RplaceModtools", "server_presets.txt");
+    private static readonly string presetDirectory =
+        Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RplaceModtools");
+    private static readonly string presetPath =
+        Path.Join(presetDirectory, "server_presets.txt");
+    private const int presetsLength = 6;
     
     public ObservableCollection<ServerPreset> ServerPresets
     {
         get
         {
             var presets = new ObservableCollection<ServerPreset>();
-            var lines = File.ReadAllLines(presetPath);
-            for (var i = 0; i < lines.Length; i += 5)
+            if (!File.Exists(presetPath))
             {
-                var set = lines[i..(i + 5)];
+                Directory.CreateDirectory(presetDirectory);
+                File.WriteAllText(presetPath, "");
+                return presets;
+            }
+
+            var lines = File.ReadAllLines(presetPath);
+            foreach (var line in lines)
+            {
+                var set = line.Split(",");
                 presets.Add(new ServerPreset
                 {
                     Websocket = set.ElementAtOrDefault(0),
                     FileServer = set.ElementAtOrDefault(1),
                     AdminKey = set.ElementAtOrDefault(2),
                     BackupListPath = set.ElementAtOrDefault(3),
-                    PlacePath = set.ElementAtOrDefault(4)
+                    PlacePath = set.ElementAtOrDefault(4),
+                    BackupsPath = set.ElementAtOrDefault(5)
                 });
             }
+
             return presets;
         }
     }
 
     public static void SaveServerPreset(ServerPreset preset)
     {
-        var contents = preset.Websocket + Environment.NewLine
-            + preset.FileServer + Environment.NewLine
-            + preset.AdminKey + Environment.NewLine
-            + preset.BackupListPath + Environment.NewLine
-            + preset.PlacePath + Environment.NewLine;
+        if (!File.Exists(presetPath))
+        {
+            Directory.CreateDirectory(presetDirectory);
+            File.WriteAllText(presetPath, "");
+        }
+
+        var contents = preset.Websocket + "," + preset.FileServer + "," + preset.AdminKey + ","
+            + preset.BackupListPath + "," + preset.PlacePath + "," + preset.BackupsPath + ",";
         File.AppendAllText(presetPath, contents);
     }
 
@@ -47,17 +62,13 @@ public partial class ServerPresetViewModel : ObservableObject
         try
         {
             var lines = File.ReadAllLines(presetPath);
-            for (var i = 0; i < lines.Length; i += 5)
-            {
-                if (lines[i] == preset.Websocket
-                    && lines[i + 1] == preset.FileServer
-                    && lines[i + 2] == preset.AdminKey
-                    && lines[i + 2] == preset.BackupListPath
-                    && lines[i + 2] == preset.PlacePath)
-                {
-                    return true;
-                }
-            }
+            return lines.Select(line => line.Split(",")).Any(set =>
+                preset.Websocket == set.ElementAtOrDefault(0) &&
+                preset.FileServer == set.ElementAtOrDefault(1) &&
+                preset.AdminKey == set.ElementAtOrDefault(2) &&
+                preset.BackupListPath == set.ElementAtOrDefault(3) &&
+                preset.PlacePath == set.ElementAtOrDefault(4) &&
+                preset.BackupsPath == set.ElementAtOrDefault(5));
         }
         catch {}
         return false;

@@ -1,6 +1,3 @@
-using System.Buffers.Binary;
-using System.Diagnostics;
-using System.Numerics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
@@ -48,6 +45,8 @@ public partial class SkCanvas : UserControl
         get => board;
         set
         {
+            // We have to invalidate the caches so that a new one can be generated
+            boardCache = null;
             board = value;
             Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
         }
@@ -58,6 +57,8 @@ public partial class SkCanvas : UserControl
         get => changes;
         set
         {
+            // We have to invalidate the caches so that a new one can be generated
+            changesCache = null;
             changes = value;
             Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
         }
@@ -202,7 +203,7 @@ public partial class SkCanvas : UserControl
                     //TODO: This method is not fully efficient and only attempting to draw at all within the selection bounds would be better.
                     foreach (var sel in ParentSk.Selections
                         .Where(sel => i % (ParentSk.CanvasWidth) >= sel.TopLeft.X
-                            && i % (ParentSk.CanvasWidth) <= sel.BottomRight.X
+                            && i % ParentSk.CanvasWidth <= sel.BottomRight.X
                             && i / ParentSk.CanvasHeight >= sel.TopLeft.Y
                             && i / ParentSk.CanvasHeight <= sel.BottomRight.Y))
                     {

@@ -108,17 +108,23 @@
        <vm:MainWindowViewModel/>
     </Design.DataContext>
     
-    <Grid ColumnDefinitions="*, Auto" x:Name="MainGrid">
-        <Border Grid.Column="0" Grid.ColumnSpan="2" x:Name="PlaceConfigPanel" HorizontalAlignment="Center" VerticalAlignment="Center" Width="380" Height="508" Background="White" BoxShadow="0 0 20 2 Gray" CornerRadius="10" ZIndex="8">
+    <Grid ColumnDefinitions="*, Auto" x:Name="MainGrid"> <!--Height="508"-->
+        <Border Grid.Column="0" Grid.ColumnSpan="2" x:Name="PlaceConfigPanel" HorizontalAlignment="Center" VerticalAlignment="Center" Width="380" Background="White" BoxShadow="0 0 20 2 Gray" CornerRadius="10" ZIndex="8">
             <Grid RowDefinitions="*, Auto">
                 <StackPanel Grid.Row="0">
                     <Image Classes="PlaceLogo" Source="../Assets/favicon.png"/>
-                    <Label Classes="PlaceTitle">RplaceTK Mod Tools - ©Zekiah-A</Label>
+                    <Label Classes="PlaceTitle">RplaceTK Mod Tools</Label>
                     <StackPanel Classes="PlaceConfig" Margin="10">
                         <TextBlock FontSize="24" Margin="0 0 0 5">Configuration:</TextBlock>
                         <AutoCompleteBox x:Name="ConfigWsInput" Watermark="Canvas websocket address" Items="{Binding KnownWebsockets}" Text="{Binding CurrentPreset.Websocket}" Margin="0 0 0 5"/>
                         <AutoCompleteBox x:Name="ConfigFsInput" Watermark="Place file server address" Items="{Binding KnownFileServers}" Text="{Binding CurrentPreset.FileServer}" Margin="0 0 0 5"/>
-                        <TextBlock FontSize="18" Margin="0 0 0 5">Client:</TextBlock>
+                        <Button x:Name="PresetsAdvancedButton" HorizontalAlignment="Center" Margin="4" Click="OnPresetsAdvancedClicked">Advanced ▼</Button>
+                        <StackPanel x:Name="PresetsAdvancedPanel" IsVisible="false">
+                            <TextBox x:Name="ConfigPlacePathInput" Watermark="Live canvas path" Text="{Binding CurrentPreset.PlacePath}" Margin="0 0 0 5"/>
+                            <TextBox x:Name="ConfigBackupListInput" Watermark="Server backup list path" Text="{Binding CurrentPreset.BackupListPath}" Margin="0 0 0 5"/>
+                            <TextBox x:Name="ConfigBackupsInput" Watermark="Server backups directory path" Text="{Binding CurrentPreset.BackupsPath}" Margin="0 0 0 5"/>
+                        </StackPanel>
+                        <TextBlock FontSize="18" Margin="0 0 0 5">Client</TextBlock>
                         <TextBox x:Name="ConfigAdminKeyInput" Watermark="Admin key" Text="{Binding CurrentPreset.AdminKey}" Margin="0 0 0 5"/>
                         <ScrollViewer>
                             <ListBox x:Name="ServerPresetListBox" Items="{Binding ServerPresets}" SelectionChanged="OnServerPresetsSelectionChanged">
@@ -201,6 +207,13 @@
                 </TransitioningContentControl>
             </Border>
             
+            <Border VerticalAlignment="Bottom" HorizontalAlignment="Right" BorderThickness="2" CornerRadius="8" Margin="16" Padding="8">
+                <Border.Background>
+                    <SolidColorBrush Color="Gray" Opacity="0.5" />
+                </Border.Background>
+                <ListBox x:Name="LiveChatListBox"><ListBox.DataContext><vm:LiveChatViewModel/></ListBox.DataContext></ListBox>
+            </Border>
+            
             <Button ZIndex="3" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="10" Padding="10" Click="OnSelectColourClicked">Select Colour</Button>
             <DockPanel ZIndex="8" Dock="Bottom" Height="150" VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Background="White" IsVisible="False" x:Name="Palette">
                 <Grid RowDefinitions="* Auto">
@@ -243,7 +256,7 @@
                     <Panel Margin="5 0 5 0">
                         <Image x:Name="PreviewImg" Source="../Assets/preview_default.png" RenderOptions.BitmapInterpolationMode="Default"/>
                             <Grid ColumnDefinitions="Auto, Auto, *" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Background="White">
-                                <Button Grid.Column="0" Margin="4" IsEnabled="False">Prev</Button>
+                                <Button Grid.Column="0" Margin="4" IsEnabled="False">Previous</Button>
                                 <Button Grid.Column="1" Margin="4" IsEnabled="False">Next</Button>
                                 <Button Grid.Column="2" x:Name="DownloadBtn" IsEnabled="False" HorizontalAlignment="Right" Margin="4" Click="OnDownloadPreviewPressed">Download</Button>
                             </Grid>
@@ -267,7 +280,7 @@
                             <ToolTip.Tip>Automate canvas moderation actions with small scripts.</ToolTip.Tip>Macro Execution
                         </ToggleButton>
                     </Grid>
-                    <ToggleSwitch x:Name="ViewSelectedDate" Margin="5" Checked="OnViewSelectedDateChecked" Unchecked="OnViewSelectedDateUnchecked"><ToolTip.Tip>By turning this on, instead of viewing the whole canvas as the backup, only the area within your selection would peek through to the backup, allowing for easier visualisations of your rollback.</ToolTip.Tip>View selected area at canvas date</ToggleSwitch>
+                    <ToggleSwitch x:Name="ViewSelectedBackup" Margin="5" Checked="OnViewSelectedBackupChecked" Unchecked="OnViewSelectedBackupUnchecked"><ToolTip.Tip>By turning this on, instead of viewing the whole canvas as the backup, only the area within your selection would peek through to the backup, allowing for easier visualisations of your rollback.</ToolTip.Tip>View selected area at backup</ToggleSwitch>
                     <Grid ColumnDefinitions="* Auto">
                         <Button Grid.Column="0" Margin="5" HorizontalAlignment="Stretch">
                             <ToolTip.Tip>Revert the selected area of the canvas to a previous date.</ToolTip.Tip>Rollback selected area
