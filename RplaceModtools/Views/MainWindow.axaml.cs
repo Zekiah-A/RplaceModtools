@@ -149,7 +149,7 @@ public partial class MainWindow : Window
             {
                 case 1:
                 {
-                    // New server board info packet, superceeds packet 2, also used by old board for cooldown
+                    // New server board info packet, superceedes packet 2, also used by old board for cooldown
                     var cooldown = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan()[5..]);
                     if (cooldown == 0xFFFFFFFF)
                     {
@@ -202,20 +202,20 @@ public partial class MainWindow : Window
                 }*/
                 case 15: // 15 = chat
                 {
-                    var msgData = Encoding.UTF8.GetString(msg.Binary).Split("\n");
-                    var text = msgData.ElementAtOrDefault(0);
-                    var name = msgData.ElementAtOrDefault(1);
-                    var channel = msgData.ElementAtOrDefault(2);
+                    var msgData = Encoding.UTF8.GetString(msg.Binary.AsSpan()[1..]).Split("\n");
                     var type = msgData.ElementAtOrDefault(3);
                     var x = msgData.ElementAtOrDefault(4);
                     var y = msgData.ElementAtOrDefault(4);
                     
-                    /*LCVM.AddMessage(new ChatMessage
+                    Dispatcher.UIThread.Post(() =>
                     {
-                        Name = name,
-                        Message = text,
-                        Channel = channel
-                    });*/
+                        LCVM.AddMessage(new ChatMessage
+                        {
+                            Name = msgData[1],
+                            Message = msgData[0],
+                            Channel = msgData[2]
+                        });
+                    });
                     break;
                 }
             }
@@ -300,21 +300,31 @@ public partial class MainWindow : Window
             return null;
         }
         
-        using var bmp = new SKBitmap((int)Board.CanvasWidth, (int)Board.CanvasHeight, true);
-        for (var i = 0; i < placeFile.Length; i++)
+        // TODO: Board.CanvasWidth, (int)Board.CanvasHeight could be wrong, we need to ensure board is properly unpacked
+        var imageInfo = new SKImageInfo((int)Board.CanvasWidth, (int)Board.CanvasHeight, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using var surface = SKSurface.Create(imageInfo);
+        var canvas = surface.Canvas;
+
+        Parallel.For(0, placeFile.Length, i =>
         {
-            bmp.SetPixel((int)(i % Board.CanvasWidth), (int)(i / Board.CanvasWidth),
-                PaletteViewModel.Colours.ElementAtOrDefault(placeFile[i]));
+            var x = (int) (i % Board.CanvasWidth);
+            var y = (int) (i / Board.CanvasWidth);
+            canvas.DrawPoint(x, y, PaletteViewModel.Colours.ElementAtOrDefault(placeFile[i]));
+        });
+        
+        using var image = surface.Snapshot();
+        using var data = image.Encode(SKEncodedImageFormat.Bmp, 100);
+        if (data is null)
+        {
+            return null;
         }
         
-        using var bitmap = bmp.Encode(SKEncodedImageFormat.Png, 100);
-        await using var imgStream = new MemoryStream();
-        imgStream.Position = 0;
-        bitmap.SaveTo(imgStream);
-        imgStream.Seek(0, SeekOrigin.Begin);
-        bmp.Dispose();
-        bitmap.Dispose();
-        return new Bitmap(imgStream);
+        Console.WriteLine("Data made");
+        await using var imageStream = data.AsStream();
+        Console.WriteLine("Stream made");
+        imageStream.Seek(0, SeekOrigin.Begin);
+        Console.WriteLine("Img");
+        return new Bitmap(imageStream);
     }
 
     //App started
@@ -341,6 +351,7 @@ public partial class MainWindow : Window
             }
             
             boardFetchSource.SetResult(await boardResponse.Content.ReadAsByteArrayAsync());
+            PreviewImg.Source = await CreateCanvasPreviewImage(boardResponse);
         });
         PlaceConfigPanel.IsVisible = false;
         DownloadBtn.IsEnabled = true;
@@ -359,7 +370,11 @@ public partial class MainWindow : Window
         if (e.Source is null || !e.Source.Equals(CanvasBackground)) return; //stop bubbling
         mouseTravel = new Point(0, 0);
         mouseDown = true;
-        if (viewModel!.CurrentTool == Tool.Select) Board.StartSelection(MouseOverPixel(e), MouseOverPixel(e));
+        
+        if (viewModel.CurrentTool == Tool.Select)
+        {
+            Board.StartSelection(MouseOverPixel(e), MouseOverPixel(e));
+        }
     }
 
     private int BoardColourAt(uint x, uint y)
@@ -743,5 +758,63 @@ public partial class MainWindow : Window
             .Where(part => !string.IsNullOrEmpty(part))
             .Select(subPath => subPath.Trim('/'))
             .ToArray()));
+    }
+
+    private void OnChatSendPressed(object? sender, RoutedEventArgs e)
+    {
+        SendChatInputMessage(ChatInput.Text);
+        ChatInput.Text = "";
+    }
+    
+    private void OnChatInputKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            SendChatInputMessage(ChatInput.Text); 
+            ChatInput.Text = "";
+        }
+    }
+
+    private void SendChatInputMessage(string input)
+    {
+        if (input.StartsWith(":help"))
+        {
+            LCVM.AddMessage(new ChatMessage
+            {
+                Name = "!!",
+                Message = "Commands:\n :help, displays commands,\n`:name username` sets your livechat username",
+                Channel = "en"
+            });
+        }
+        else if (input.StartsWith(":name"))
+        {
+            viewModel.ChatUsername = ChatInput.Text[5..].Trim();
+            
+            LCVM.AddMessage(new ChatMessage
+            {
+                Name = "!!",
+                Message = "Chat username set to " + viewModel.ChatUsername,
+                Channel = "en"
+            });
+        }
+        else if (viewModel.ChatUsername is null)
+        {
+            LCVM.AddMessage(new ChatMessage
+            {
+                Name = "!!",
+                Message = "No chat username set! Use command `:name username`, and use :help for more commands",
+                Channel = "en"
+            });
+        }
+        else
+        {
+            var chatBuilder = new StringBuilder();
+            chatBuilder.AppendLine(input);
+            chatBuilder.AppendLine(viewModel.ChatUsername);
+            chatBuilder.AppendLine("live");
+            chatBuilder.AppendLine("0");
+            chatBuilder.AppendLine("0");
+            socket?.Send(Encoding.UTF8.GetBytes("\x0f" + chatBuilder));
+        }
     }
 }

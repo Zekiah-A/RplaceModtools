@@ -1,6 +1,7 @@
 ﻿using Avalonia.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.DependencyInjection;
 using RplaceModtools.Models;
 
 namespace RplaceModtools.ViewModels;
@@ -28,9 +29,14 @@ public partial class MainWindowViewModel : ObservableObject
         "https://raw.githubusercontent.com/rplacetk/canvas1/main/",
         "https://raw.githubusercontent.com/rplacetk/canvas1/04072023/"
     };
+    public string? ChatUsername { get; set; }
 
     [RelayCommand]
-    private void SelectPaintTool() => CurrentTool = Tool.PaintBrush;
+    private void SelectPaintTool()
+    {
+        StateInfo = App.Current.Services.GetRequiredService<LiveCanvasStateInfoViewModel>();
+        CurrentTool = Tool.PaintBrush;
+    }
 
     [RelayCommand]
     private void SelectRubberTool() => CurrentTool = Tool.Rubber;
