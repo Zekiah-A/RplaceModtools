@@ -12,14 +12,8 @@ public partial class LiveCanvasStateInfo : UserControl
     
     public LiveCanvasStateInfo()
     {
-        InitializeComponent();
-    }
-    
-    
-    private void InitializeComponent()
-    {
         viewModel = App.Current.Services.GetRequiredService<LiveCanvasStateInfoViewModel>();
         DataContext = viewModel;
-        AvaloniaXamlLoader.Load(this);
+        InitializeComponent();
     }
 }

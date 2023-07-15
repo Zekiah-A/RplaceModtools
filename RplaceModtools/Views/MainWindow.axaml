@@ -290,11 +290,19 @@
                 </TabItem>
                 <TabItem Header="Live chat">
                     <Grid RowDefinitions="* 4 Auto" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                        <ListBox Grid.Row="0" x:Name="LiveChatListBox" Items="{Binding Messages}" Background="Transparent" IsHitTestVisible="False">
+                        <ListBox Grid.Row="0" x:Name="LiveChatListBox" Items="{Binding Messages}" Background="Transparent" VirtualizationMode="Simple">
                             <ListBox.DataContext><vm:LiveChatViewModel/></ListBox.DataContext>
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <StackPanel Orientation="Horizontal">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Stretch">
+                                        <StackPanel.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem IsVisible="{Binding Uid, Converter={x:Static ObjectConverters.IsNotNull}}" Header="{Binding Uid, StringFormat='Chatter ID: {0}'}"></MenuItem>
+                                                <MenuItem IsVisible="{Binding Uid, Converter={x:Static ObjectConverters.IsNotNull}}" PointerPressed="OnKickChatterPressed" Header="{Binding Name, StringFormat='Ban {0}'}" />
+                                                <MenuItem IsVisible="{Binding Uid, Converter={x:Static ObjectConverters.IsNotNull}}" PointerPressed="OnMuteChatterPressed" IsEnabled="False" Header="{Binding Name, StringFormat='Mute {0}'}" />
+                                                <MenuItem IsVisible="{Binding Uid, Converter={x:Static ObjectConverters.IsNotNull}}" PointerPressed="OnBanChatterPressed" Header="{Binding Name, StringFormat='Kick {0}'}" />
+                                            </ContextMenu>
+                                        </StackPanel.ContextMenu>
                                         <Border CornerRadius="4" BorderBrush="Black" Padding="2">
                                             <TextBlock FontWeight="Bold" Foreground="{Binding Path=Name, Converter={StaticResource HashColourConverter}}" Text="{Binding Path=Name}" />
                                         </Border>
@@ -306,7 +314,7 @@
                         </ListBox>
                         <Grid Grid.Row="2" ColumnDefinitions="*, 4, Auto">
                             <TextBox Grid.Column="0" x:Name="ChatInput" Watermark="Enter a message..." KeyDown="OnChatInputKeyDown"></TextBox>
-                            <Button Grid.Column="2" VerticalAlignment="Stretch" Click="OnChatSendPressed">send</Button>
+                            <Button Grid.Column="2" VerticalAlignment="Stretch" Click="OnChatSendPressed">Send</Button>
                         </Grid>
                     </Grid>
                 </TabItem>

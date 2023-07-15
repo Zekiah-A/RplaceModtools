@@ -11,7 +11,6 @@ public partial class ServerPresetViewModel : ObservableObject
         Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RplaceModtools");
     private static readonly string presetPath =
         Path.Join(presetDirectory, "server_presets.txt");
-    private const int presetsLength = 6;
     
     public ObservableCollection<ServerPreset> ServerPresets
     {
@@ -28,15 +27,20 @@ public partial class ServerPresetViewModel : ObservableObject
             var lines = File.ReadAllLines(presetPath);
             foreach (var line in lines)
             {
+                if (string.IsNullOrEmpty(line))
+                {
+                    continue;
+                }
+                
                 var set = line.Split(",");
                 presets.Add(new ServerPreset
                 {
                     Websocket = set.ElementAtOrDefault(0),
                     FileServer = set.ElementAtOrDefault(1),
                     AdminKey = set.ElementAtOrDefault(2),
-                    BackupListPath = set.ElementAtOrDefault(3),
-                    PlacePath = set.ElementAtOrDefault(4),
-                    BackupsPath = set.ElementAtOrDefault(5)
+                    BackupListPath = set.ElementAtOrDefault(3) ?? "/backuplist",
+                    PlacePath = set.ElementAtOrDefault(4) ?? "/place",
+                    BackupsPath = set.ElementAtOrDefault(5) ?? "/backups"
                 });
             }
 
@@ -53,7 +57,7 @@ public partial class ServerPresetViewModel : ObservableObject
         }
 
         var contents = preset.Websocket + "," + preset.FileServer + "," + preset.AdminKey + ","
-            + preset.BackupListPath + "," + preset.PlacePath + "," + preset.BackupsPath + ",";
+            + preset.BackupListPath + "," + preset.PlacePath + "," + preset.BackupsPath + "\n";
         File.AppendAllText(presetPath, contents);
     }
 
@@ -70,7 +74,11 @@ public partial class ServerPresetViewModel : ObservableObject
                 preset.PlacePath == set.ElementAtOrDefault(4) &&
                 preset.BackupsPath == set.ElementAtOrDefault(5));
         }
-        catch {}
+        catch
+        {
+            // Ignored
+        }
+
         return false;
     }
 }

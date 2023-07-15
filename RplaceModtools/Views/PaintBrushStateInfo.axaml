@@ -3,26 +3,27 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:viewModels="clr-namespace:RplaceModtools.ViewModels"
-             xmlns:rPlace="clr-namespace:RplaceModtools"
+             xmlns:rplaceModtools="clr-namespace:RplaceModtools"
              mc:Ignorable="d"
              x:Class="RplaceModtools.Views.PaintBrushStateInfo">
   
-  <Design.DataContext>
-    <viewModels:PaintBrushStateInfoViewModel/>
-  </Design.DataContext>
-  <UserControl.DataContext>
-    <viewModels:LiveCanvasStateInfoViewModel/>
-  </UserControl.DataContext>
+    <Design.DataContext>
+        <viewModels:PaintBrushStateInfoViewModel/>
+    </Design.DataContext>
 
-  <UserControl.Resources>
-    <rPlace:ShapeEmojiConverter x:Key="ShapeEmojiConverter"/>
-  </UserControl.Resources>
+    <UserControl.DataContext>
+        <viewModels:PaintBrushStateInfoViewModel/>
+    </UserControl.DataContext>
+    
+    <UserControl.Resources>
+        <rplaceModtools:ShapeEmojiConverter x:Key="ShapeEmojiConverter"/>
+    </UserControl.Resources>
   
-  <StackPanel>
-    <StackPanel.DataContext><viewModels:MainWindowViewModel></viewModels:MainWindowViewModel></StackPanel.DataContext>
-    <TextBlock FontSize="16">Brush radius:</TextBlock>
-    <NumericUpDown Minimum="1" Maximum="10" Height="16" Value="{Binding CurrentPaintBrushRadius }"/>      
-    <TextBlock FontSize="16">Brush shape:</TextBlock>
-    <ToggleButton Content="{Binding CurrentBrushShape, Converter={StaticResource ShapeEmojiConverter}}"/>
-  </StackPanel>
+    <StackPanel x:Name="InfoPanel">
+        <Design.DataContext><viewModels:MainWindowViewModel/></Design.DataContext>
+        <TextBlock FontSize="16">Brush radius:</TextBlock>
+        <NumericUpDown Minimum="1" Maximum="10" Height="16" Value="{Binding CurrentPaintBrushRadius }"/>      
+        <TextBlock FontSize="16">Brush shape:</TextBlock>
+        <ToggleButton Content="{Binding CurrentBrushShape, Converter={StaticResource ShapeEmojiConverter}}"/>
+    </StackPanel>
 </UserControl>

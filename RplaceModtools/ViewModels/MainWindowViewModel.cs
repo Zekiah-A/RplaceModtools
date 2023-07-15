@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
 using RplaceModtools.Models;
+using RplaceModtools.Views;
 
 namespace RplaceModtools.ViewModels;
 public partial class MainWindowViewModel : ObservableObject
@@ -34,13 +35,21 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void SelectPaintTool()
     {
-        StateInfo = App.Current.Services.GetRequiredService<LiveCanvasStateInfoViewModel>();
+        StateInfo = App.Current.Services.GetRequiredService<PaintBrushStateInfoViewModel>();
         CurrentTool = Tool.PaintBrush;
     }
 
     [RelayCommand]
-    private void SelectRubberTool() => CurrentTool = Tool.Rubber;
-    
+    private void SelectRubberTool()
+    {
+        StateInfo = null;
+        CurrentTool = Tool.Rubber;
+    }
+
     [RelayCommand]
-    private void SelectSelectionTool() => CurrentTool = Tool.Select;
+    private void SelectSelectionTool()
+    {
+        StateInfo = null;
+        CurrentTool = Tool.Select;
+    }
 }

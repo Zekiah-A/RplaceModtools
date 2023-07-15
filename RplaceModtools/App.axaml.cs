@@ -17,7 +17,7 @@ namespace RplaceModtools
         {
             Services = new ServiceCollection()
                 .AddSingleton<MainWindow>()
-                .AddTransient<MainWindowViewModel>()
+                .AddSingleton<MainWindowViewModel>()
                 .AddTransient<LiveCanvasStateInfoViewModel>()
                 .AddTransient<PaintBrushStateInfoViewModel>()
                 .BuildServiceProvider();

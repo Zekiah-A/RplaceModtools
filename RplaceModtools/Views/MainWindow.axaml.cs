@@ -194,28 +194,31 @@ public partial class MainWindow : Window
                     }
                     break;
                 }
-                /*case 7: //Sending back what you placed
-                {
-                    var pos = BitConverter.ToUInt32(msg.Binary.ToArray(), 5);
-                    var col = msg.Binary[9];
-                    break;
-                }*/
                 case 15: // 15 = chat
                 {
                     var msgData = Encoding.UTF8.GetString(msg.Binary.AsSpan()[1..]).Split("\n");
                     var type = msgData.ElementAtOrDefault(3);
                     var x = msgData.ElementAtOrDefault(4);
-                    var y = msgData.ElementAtOrDefault(4);
+                    var y = msgData.ElementAtOrDefault(5);
+                    var uid = msgData.ElementAtOrDefault(6);
                     
-                    Dispatcher.UIThread.Post(() =>
+                    if (type is null or "live")
                     {
-                        LCVM.AddMessage(new ChatMessage
+                        Dispatcher.UIThread.Post(() =>
                         {
-                            Name = msgData[1],
-                            Message = msgData[0],
-                            Channel = msgData[2]
+                            LCVM.AddMessage(new ChatMessage
+                            {
+                                Message = msgData[0],
+                                Name = msgData[1],
+                                Channel = msgData[2],
+                                Uid = uid
+                            });
                         });
-                    });
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Could not handle message: [{msgData[1]}/{msgData[2]}{(uid == null ? "" : "/" + uid)}] {msgData[0]}");
+                    }
                     break;
                 }
             }
@@ -314,16 +317,13 @@ public partial class MainWindow : Window
         
         using var image = surface.Snapshot();
         using var data = image.Encode(SKEncodedImageFormat.Bmp, 100);
-        if (data is null)
+        if (data is null) // TODO: Figure out why when using bitmap we get null data
         {
             return null;
         }
         
-        Console.WriteLine("Data made");
         await using var imageStream = data.AsStream();
-        Console.WriteLine("Stream made");
         imageStream.Seek(0, SeekOrigin.Begin);
-        Console.WriteLine("Img");
         return new Bitmap(imageStream);
     }
 
@@ -623,23 +623,33 @@ public partial class MainWindow : Window
         }
 
         var brushStack = new Stack<Pixel>();
+        var realPos = px.GetPosition(Board.CanvasWidth);
         if (viewModel.CurrentBrushShape == Shape.Square)
         {
             var diameter = 2 * radius + 1;
-            for (var i = 0; i < diameter; i++)
+
+            for (var h = 0; h < diameter; h++)
             {
-                for (var j = 0; j < diameter; j++)
+                for (var v = 0; v < diameter; v++)
                 {
-                    var y = j - radius;
-                    var x = i - radius;
+                    // x, y relative to circle coordinates
+                    var x = h - radius;
+                    var y = v - radius;
 
                     if (x * x + y * y > radius * radius + 1)
                     {
                         continue;
                     }
-                    
+
+                    var pixelX = (int) (radius + x + realPos.X);
+                    var pixelY = (int) (radius + y + realPos.Y);
+                    if (pixelX < 0 || pixelX > Board.CanvasWidth || pixelY < 0 || pixelY > Board.CanvasHeight)
+                    {
+                        continue;
+                    }
+
                     var radiusPx = px.Clone();
-                    radiusPx.SetPosition(x, y, Board.CanvasWidth);
+                    radiusPx.SetPosition(pixelX, pixelY, Board.CanvasWidth);
                     Board.Set(radiusPx);
                     brushStack.Push(radiusPx);
                 }
@@ -811,10 +821,51 @@ public partial class MainWindow : Window
             var chatBuilder = new StringBuilder();
             chatBuilder.AppendLine(input);
             chatBuilder.AppendLine(viewModel.ChatUsername);
+            chatBuilder.AppendLine("en");
             chatBuilder.AppendLine("live");
             chatBuilder.AppendLine("0");
             chatBuilder.AppendLine("0");
             socket?.Send(Encoding.UTF8.GetBytes("\x0f" + chatBuilder));
         }
+    }
+    
+    // TODO: Repeated code lol 
+    private void OnKickChatterPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not MenuItem { DataContext: ChatMessage message })
+        {
+            return;
+        }
+
+        var kickBuffer = Encoding.UTF8.GetBytes("XX" + message.Uid);
+        kickBuffer[0] = 98;
+        kickBuffer[1] = 0;
+        socket?.Send(kickBuffer);
+    }
+    
+    private void OnMuteChatterPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not MenuItem { DataContext: ChatMessage message })
+        {
+            return;
+        }
+        
+        var muteBuffer = Encoding.UTF8.GetBytes("XX" + message.Uid);
+        muteBuffer[0] = 98;
+        muteBuffer[2] = 1;
+        socket?.Send(muteBuffer);
+    }
+
+    private void OnBanChatterPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not MenuItem { DataContext: ChatMessage message })
+        {
+            return;
+        }
+        
+        var banBuffer = Encoding.UTF8.GetBytes("XX" + message.Uid);
+        banBuffer[0] = 98;
+        banBuffer[2] = 2;
+        socket?.Send(banBuffer);
     }
 }

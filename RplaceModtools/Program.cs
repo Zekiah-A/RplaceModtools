@@ -13,8 +13,6 @@ namespace RplaceModtools
         [STAThread]
         public static void Main(string[] args)
         {
-            TaskScheduler.UnobservedTaskException += (sender, eventArgs) =>
-                Console.WriteLine(args);
             BuildAvaloniaApp()
                 .StartWithClassicDesktopLifetime(args);
         } 

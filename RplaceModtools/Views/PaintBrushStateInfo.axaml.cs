@@ -15,10 +15,7 @@ public partial class PaintBrushStateInfo : UserControl
         viewModel = App.Current.Services.GetRequiredService<PaintBrushStateInfoViewModel>();
         DataContext = viewModel;
         InitializeComponent();
-    }
 
-    private void InitializeComponent()
-    {
-        AvaloniaXamlLoader.Load(this);
+        InfoPanel.DataContext = App.Current.Services.GetRequiredService<MainWindowViewModel>();
     }
 }
