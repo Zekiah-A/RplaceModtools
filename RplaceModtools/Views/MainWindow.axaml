@@ -103,6 +103,8 @@
         <rplaceModtools:StateInfoIsConverter x:Key="StateInfoIsConverter"/>
         <rplaceModtools:CurrentToolIsConverter x:Key="CurrentToolIsConverter"/>
         <rplaceModtools:HashColourConverter x:Key="HashColourConverter" />
+        <rplaceModtools:ValueEqualsConverter x:Key="ValueEqualsConverter" />
+        <rplaceModtools:ValueNotEqualsConverter x:Key="ValueNotEqualsConverter" />
     </Window.Resources>
     
     <Design.DataContext>
@@ -126,7 +128,7 @@
                             <TextBox x:Name="ConfigBackupsInput" Watermark="Server backups directory path" Text="{Binding CurrentPreset.BackupsPath}" Margin="0 0 0 5"/>
                         </StackPanel>
                         <TextBlock FontSize="18" Margin="0 0 0 5">Client</TextBlock>
-                        <TextBox x:Name="ConfigAdminKeyInput" Watermark="Admin key" Text="{Binding CurrentPreset.AdminKey}" Margin="0 0 0 5"/>
+                        <TextBox x:Name="ConfigAdminKeyInput" RevealPassword="False" PasswordChar="*" Watermark="Admin key" Text="{Binding CurrentPreset.AdminKey}" Margin="0 0 0 5"/>
                         <ScrollViewer>
                             <ListBox x:Name="ServerPresetListBox" Items="{Binding ServerPresets}" SelectionChanged="OnServerPresetsSelectionChanged">
                                 <ListBox.DataContext><vm:ServerPresetViewModel/></ListBox.DataContext>
@@ -188,6 +190,48 @@
                 </StackPanel>
                 <Button Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Bottom" CornerRadius="5" Padding="40 10 40 10" Margin="5" Click="OnStartButtonPressed">Start</Button>
             </Grid>
+        </Border>
+
+        <Border Grid.Column="0" Grid.ColumnSpan="2" x:Name="ActionConfigPanel" IsVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Width="380" Background="White" BorderBrush="Gray" BorderThickness="1" CornerRadius="8" ZIndex="8">
+            <StackPanel Margin="8" Spacing="4">
+                <TextBlock FontSize="24">Manage user:</TextBlock>
+                <StackPanel>
+                    <TextBlock FontWeight="Bold">Action:</TextBlock>
+                    <RadioButton IsChecked="{Binding CurrentModerationAction,
+                            Converter={StaticResource ValueEqualsConverter},
+                            ConverterParameter={x:Static rplaceModtools:ModerationAction.Kick}, Mode=OneWay}"
+                        IsHitTestVisible="False">Kick</RadioButton>
+                    <RadioButton IsChecked="{Binding CurrentModerationAction,
+                            Converter={StaticResource ValueEqualsConverter},
+                            ConverterParameter = {x:Static rplaceModtools:ModerationAction.Mute}, Mode=OneWay}"
+                        IsHitTestVisible="False">Mute</RadioButton>
+                    <RadioButton IsChecked="{Binding CurrentModerationAction,
+                            Converter={StaticResource ValueEqualsConverter},
+                            ConverterParameter = {x:Static rplaceModtools:ModerationAction.Ban}, Mode=OneWay}"
+                        IsHitTestVisible="False">Ban</RadioButton>
+                </StackPanel>
+                <StackPanel IsVisible="{Binding CurrentModerationAction,
+                    Converter={StaticResource ValueNotEqualsConverter},
+                    ConverterParameter = {x:Static rplaceModtools:ModerationAction.Kick}, Mode=OneWay}">
+                    <TextBlock FontWeight="Bold">Duration (hours, minutes):</TextBlock>
+                    <TimePicker SelectedTime="{Binding CurrentModerationDuration}"></TimePicker>
+                </StackPanel>
+                <StackPanel>
+                    <TextBlock FontWeight="Bold">Reason:</TextBlock>
+                    <TextBox Watermark="Explanation*" MaxLength="300" Text="{Binding CurrentModerationReason}"></TextBox>
+                </StackPanel>
+                <Border Padding="8" Margin="4" CornerRadius="4">
+                    <Border.Background>
+                        <SolidColorBrush Color="Gray" Opacity="0.5" />
+                    </Border.Background>
+                    
+                    <TextBlock FontStyle="Italic" TextWrapping="Wrap" Foreground="Yellow">⚠ All moderation actions are logged by the server and reports sent to all other staff. Follow the moderation rules. Do not abuse power.</TextBlock>
+                </Border>
+                <Grid ColumnDefinitions="* 16 *">
+                    <Button Grid.Column="0" HorizontalAlignment="Stretch" Click="OnActionConfigSubmitPressed">Submit</Button>
+                    <Button Grid.Column="2" HorizontalAlignment="Stretch" Click="OnActionConfigCancelPressed">Cancel</Button>
+                </Grid>
+            </StackPanel>
         </Border>
 
         <Panel Grid.Column="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="CanvasBackground">
@@ -263,11 +307,11 @@
                                               Grid.Row="0" Grid.Column="0" HorizontalAlignment="Stretch" Margin="0 0 5 0">
                                     <ToolTip.Tip>Easily and quickly perform drawing operations upon the canvas.</ToolTip.Tip>Paintbrush
                                 </ToggleButton>
-                                <ToggleButton x:Name="RubberTool" Command="{Binding SelectRubberToolCommand}" Checked="ToolToggleButtonCheck"
+                                <ToggleButton IsEnabled="False" x:Name="RubberTool" Command="{Binding SelectRubberToolCommand}" Checked="ToolToggleButtonCheck"
                                               Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" Margin="5 0 0 0">
                                     <ToolTip.Tip>Erase areas of drawings with the paintbrush tool to the the canvas original state.</ToolTip.Tip>Rubber
                                 </ToggleButton>
-                                <ToggleButton x:Name="SelectTool" Command="{Binding SelectSelectionToolCommand}" Checked="ToolToggleButtonCheck"
+                                <ToggleButton IsEnabled="False" x:Name="SelectTool" Command="{Binding SelectSelectionToolCommand}" Checked="ToolToggleButtonCheck"
                                               Grid.Row="1" Grid.Column="0" HorizontalAlignment="Stretch" Margin="0 5 5 0">
                                     <ToolTip.Tip>Select an area of the canvas to view for rollback, or perform modifications on.</ToolTip.Tip>Select tool
                                 </ToggleButton>
@@ -297,10 +341,19 @@
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Stretch">
                                         <StackPanel.ContextMenu>
                                             <ContextMenu>
-                                                <MenuItem IsVisible="{Binding Uid, Converter={x:Static ObjectConverters.IsNotNull}}" Header="{Binding Uid, StringFormat='Chatter ID: {0}'}"></MenuItem>
-                                                <MenuItem IsVisible="{Binding Uid, Converter={x:Static ObjectConverters.IsNotNull}}" PointerPressed="OnKickChatterPressed" Header="{Binding Name, StringFormat='Ban {0}'}" />
-                                                <MenuItem IsVisible="{Binding Uid, Converter={x:Static ObjectConverters.IsNotNull}}" PointerPressed="OnMuteChatterPressed" IsEnabled="False" Header="{Binding Name, StringFormat='Mute {0}'}" />
-                                                <MenuItem IsVisible="{Binding Uid, Converter={x:Static ObjectConverters.IsNotNull}}" PointerPressed="OnBanChatterPressed" Header="{Binding Name, StringFormat='Kick {0}'}" />
+                                                <MenuItem IsVisible="{Binding Uid,
+                                                    Converter={x:Static ObjectConverters.IsNotNull}}"
+                                                    Header="{Binding Uid, StringFormat='Chatter ID: {0}'}"></MenuItem>
+                                                <MenuItem IsVisible="{Binding Uid,
+                                                    Converter={x:Static ObjectConverters.IsNotNull}}"
+                                                    PointerPressed="OnKickChatterPressed"
+                                                    Header="{Binding Name, StringFormat='Kick {0}'}" />
+                                                <MenuItem IsVisible="{Binding Uid,
+                                                    Converter={x:Static ObjectConverters.IsNotNull}}" PointerPressed="OnMuteChatterPressed"
+                                                    Header="{Binding Name, StringFormat='Mute {0}'}" />
+                                                <MenuItem IsEnabled="False" IsVisible="{Binding Uid,
+                                                    Converter={x:Static ObjectConverters.IsNotNull}}"
+                                                    PointerPressed="OnBanChatterPressed" Header="{Binding Name, StringFormat='Ban {0}'}" />
                                             </ContextMenu>
                                         </StackPanel.ContextMenu>
                                         <Border CornerRadius="4" BorderBrush="Black" Padding="2">

@@ -10,6 +10,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using Avalonia.Themes.Fluent;
 using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
@@ -69,9 +70,6 @@ public partial class MainWindow : Window
         
         InitializeComponent();
         
-        // Setting it from XAML causes the event to be fired before other controls get initialized which throws a NRE.
-        PaintTool.IsChecked = true;
-        
         CanvasBackground.AddHandler(PointerPressedEvent, OnBackgroundMouseDown, handledEventsToo: false);
         CanvasBackground.AddHandler(PointerMovedEvent, OnBackgroundMouseMove, handledEventsToo: false);
         CanvasBackground.AddHandler(PointerReleasedEvent, OnBackgroundMouseRelease, handledEventsToo: false);
@@ -123,7 +121,7 @@ public partial class MainWindow : Window
         return changes;
     }
 
-    private async Task CreateConnection(string uri)
+    private async Task CreateConnection(Uri uri)
     {
         var factory = new Func<ClientWebSocket>(() =>
         { 
@@ -134,7 +132,7 @@ public partial class MainWindow : Window
             wsClient.Options.SetRequestHeader("Origin", "https://rplace.tk");
             return wsClient;
         });
-        socket = new WebsocketClient(new Uri(uri), factory);
+        socket = new WebsocketClient(uri, factory);
         socket.ReconnectTimeout = TimeSpan.FromSeconds(10);
         
         socket.ReconnectionHappened.Subscribe(info =>
@@ -316,15 +314,18 @@ public partial class MainWindow : Window
         });
         
         using var image = surface.Snapshot();
-        using var data = image.Encode(SKEncodedImageFormat.Bmp, 100);
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
         if (data is null) // TODO: Figure out why when using bitmap we get null data
         {
             return null;
         }
         
-        await using var imageStream = data.AsStream();
+        var imageStream = data.AsStream();
         imageStream.Seek(0, SeekOrigin.Begin);
-        return new Bitmap(imageStream);
+        var imageBitmap = new Bitmap(imageStream);
+        await imageStream.FlushAsync();
+        await imageStream.DisposeAsync();
+        return imageBitmap;
     }
 
     //App started
@@ -337,7 +338,7 @@ public partial class MainWindow : Window
         }
         
         //UI and connections
-        _ = CreateConnection(viewModel.CurrentPreset.Websocket + viewModel.CurrentPreset.AdminKey);
+        _ = CreateConnection(UriCombine(viewModel.CurrentPreset.Websocket.ToString(), viewModel.CurrentPreset.AdminKey));
         _ = Task.Run(async () =>
         {
             var boardPath = UriCombine(viewModel.CurrentPreset.FileServer,
@@ -641,8 +642,8 @@ public partial class MainWindow : Window
                         continue;
                     }
 
-                    var pixelX = (int) (radius + x + realPos.X);
-                    var pixelY = (int) (radius + y + realPos.Y);
+                    var pixelX = (int) (radius + x + realPos.X - radius / 2);
+                    var pixelY = (int) (radius + y + realPos.Y - radius / 2);
                     if (pixelX < 0 || pixelX > Board.CanvasWidth || pixelY < 0 || pixelY > Board.CanvasHeight)
                     {
                         continue;
@@ -829,18 +830,16 @@ public partial class MainWindow : Window
         }
     }
     
-    // TODO: Repeated code lol 
     private void OnKickChatterPressed(object? sender, PointerPressedEventArgs e)
     {
         if (sender is not MenuItem { DataContext: ChatMessage message })
         {
             return;
         }
-
-        var kickBuffer = Encoding.UTF8.GetBytes("XX" + message.Uid);
-        kickBuffer[0] = 98;
-        kickBuffer[1] = 0;
-        socket?.Send(kickBuffer);
+        
+        ActionConfigPanel.IsVisible = true;
+        viewModel.CurrentModerationAction = ModerationAction.Kick;
+        viewModel.CurrentModerationUid = message.Uid;
     }
     
     private void OnMuteChatterPressed(object? sender, PointerPressedEventArgs e)
@@ -850,10 +849,9 @@ public partial class MainWindow : Window
             return;
         }
         
-        var muteBuffer = Encoding.UTF8.GetBytes("XX" + message.Uid);
-        muteBuffer[0] = 98;
-        muteBuffer[2] = 1;
-        socket?.Send(muteBuffer);
+        ActionConfigPanel.IsVisible = true;
+        viewModel.CurrentModerationAction = ModerationAction.Mute;
+        viewModel.CurrentModerationUid = message.Uid;
     }
 
     private void OnBanChatterPressed(object? sender, PointerPressedEventArgs e)
@@ -863,9 +861,70 @@ public partial class MainWindow : Window
             return;
         }
         
-        var banBuffer = Encoding.UTF8.GetBytes("XX" + message.Uid);
-        banBuffer[0] = 98;
-        banBuffer[2] = 2;
-        socket?.Send(banBuffer);
+        ActionConfigPanel.IsVisible = true;
+        viewModel.CurrentModerationAction = ModerationAction.Ban;
+        viewModel.CurrentModerationUid = message.Uid;
+    }
+
+    private void OnActionConfigSubmitPressed(object? sender, RoutedEventArgs e)
+    {
+        switch (viewModel.CurrentModerationAction)
+        {
+            case ModerationAction.Kick:
+            {
+                var reasonBytes = Encoding.UTF8.GetBytes(viewModel.CurrentModerationReason);
+                var uidBytes = Encoding.UTF8.GetBytes(viewModel.CurrentModerationUid);
+                var kickBuffer = new byte[3 + uidBytes.Length + reasonBytes.Length];
+                kickBuffer[0] = 98;
+                kickBuffer[1] = (byte) ModerationAction.Kick;
+                kickBuffer[2] = (byte) uidBytes.Length;
+                uidBytes.CopyTo(kickBuffer.AsSpan()[3..]);
+                reasonBytes.CopyTo(kickBuffer.AsSpan()[(3 + uidBytes.Length)..]);
+                socket?.Send(kickBuffer);
+                break;
+            }
+            case ModerationAction.Mute:
+            {
+                var reasonBytes = Encoding.UTF8.GetBytes(viewModel.CurrentModerationReason);
+                var uidBytes = Encoding.UTF8.GetBytes(viewModel.CurrentModerationUid);
+                var muteBuffer = new byte[7 + uidBytes.Length + reasonBytes.Length];
+                muteBuffer[0] = 98;
+                muteBuffer[1] = (byte) ModerationAction.Mute;
+                BinaryPrimitives.WriteUInt32BigEndian(muteBuffer.AsSpan()[2..], (ushort) viewModel.CurrentModerationDuration.TotalSeconds);
+                muteBuffer[6] = (byte) uidBytes.Length;
+                uidBytes.CopyTo(muteBuffer.AsSpan()[7..]);
+                reasonBytes.CopyTo(muteBuffer.AsSpan()[(7 + uidBytes.Length)..]);
+                socket?.Send(muteBuffer);
+                break;
+            }
+            case ModerationAction.Ban:
+            {
+                var reasonBytes = Encoding.UTF8.GetBytes(viewModel.CurrentModerationReason);
+                var uidBytes = Encoding.UTF8.GetBytes(viewModel.CurrentModerationUid);
+                var muteBuffer = new byte[7 + uidBytes.Length + reasonBytes.Length];
+                muteBuffer[0] = 98;
+                muteBuffer[1] = (byte) ModerationAction.Ban;
+                BinaryPrimitives.WriteUInt32BigEndian(muteBuffer.AsSpan()[2..], (ushort) viewModel.CurrentModerationDuration.TotalSeconds);
+                muteBuffer[6] = (byte) uidBytes.Length;
+                uidBytes.CopyTo(muteBuffer.AsSpan()[7..]);
+                reasonBytes.CopyTo(muteBuffer.AsSpan()[(7 + uidBytes.Length)..]);
+                socket?.Send(muteBuffer);
+                break;
+            }
+        }
+        
+        ResetCurrentModerationAction();
+    }
+    
+    private void OnActionConfigCancelPressed(object? sender, RoutedEventArgs e)
+    {
+        ResetCurrentModerationAction();
+    }
+
+    private void ResetCurrentModerationAction()
+    {
+        ActionConfigPanel.IsVisible = false;
+        viewModel.CurrentModerationAction = ModerationAction.None;
+        viewModel.CurrentModerationUid = "";
     }
 }

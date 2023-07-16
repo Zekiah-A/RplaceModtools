@@ -8,6 +8,11 @@ using RplaceModtools.Views;
 namespace RplaceModtools.ViewModels;
 public partial class MainWindowViewModel : ObservableObject
 {
+    [ObservableProperty] private ModerationAction currentModerationAction = ModerationAction.None;
+    [ObservableProperty] private TimeSpan currentModerationDuration;
+    [ObservableProperty] private string currentModerationReason;
+    [ObservableProperty] private string currentModerationUid;
+
     [ObservableProperty] private ServerPreset currentPreset = new()
     {
         PlacePath = "/place",
