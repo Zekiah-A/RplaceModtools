@@ -6,15 +6,19 @@ namespace RplaceModtools.ViewModels;
 
 public partial class LiveChatViewModel : ObservableObject
 {
-    [ObservableProperty] private ObservableCollection<ChatMessage> messages;
+    [ObservableProperty] private ObservableCollection<LiveChatChannelViewModel> channels;
+    [ObservableProperty] private LiveChatChannelViewModel currentChannel;
 
     public LiveChatViewModel()
     {
-        messages = new ObservableCollection<ChatMessage>();
-    }
+        var englishDefault = new LiveChatChannelViewModel("en");
+        var turkishDefault = new LiveChatChannelViewModel("tr");
+        channels = new ObservableCollection<LiveChatChannelViewModel>()
+        {
+            englishDefault,
+            turkishDefault
+        };
 
-    public void AddMessage(ChatMessage message)
-    {
-        messages.Add(message);
+        currentChannel = englishDefault;
     }
 }

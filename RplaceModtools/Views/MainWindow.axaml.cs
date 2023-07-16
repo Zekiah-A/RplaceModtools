@@ -37,7 +37,7 @@ public partial class MainWindow : Window
     //TODO: Switch these to using dependency injection
     private PaletteViewModel PVM => (PaletteViewModel) PaletteListBox.DataContext!;
     private ServerPresetViewModel SPVM => (ServerPresetViewModel) ServerPresetListBox.DataContext!;
-    private LiveChatViewModel LCVM => (LiveChatViewModel) LiveChatListBox.DataContext!;
+    private LiveChatViewModel LCVM => (LiveChatViewModel) LiveChatGridContainer.DataContext!;
     
     private Point LookingAtPixel
     {
@@ -195,6 +195,9 @@ public partial class MainWindow : Window
                 case 15: // 15 = chat
                 {
                     var msgData = Encoding.UTF8.GetString(msg.Binary.AsSpan()[1..]).Split("\n");
+                    var message = msgData[0];
+                    var name = msgData[1];
+                    var channelName = msgData[2];
                     var type = msgData.ElementAtOrDefault(3);
                     var x = msgData.ElementAtOrDefault(4);
                     var y = msgData.ElementAtOrDefault(5);
@@ -204,11 +207,17 @@ public partial class MainWindow : Window
                     {
                         Dispatcher.UIThread.Post(() =>
                         {
-                            LCVM.AddMessage(new ChatMessage
+                            var channelViewModel = LCVM.Channels.FirstOrDefault(channel => channel.ChannelName == channelName);
+                            if (channelViewModel is null)
                             {
-                                Message = msgData[0],
-                                Name = msgData[1],
-                                Channel = msgData[2],
+                                channelViewModel = new LiveChatChannelViewModel(channelName);
+                                LCVM.Channels.Add(channelViewModel);
+                            }
+                            
+                            channelViewModel.AddMessage(new ChatMessage
+                            {
+                                Message = message,
+                                Name = name,
                                 Uid = uid
                             });
                         });
@@ -484,8 +493,9 @@ public partial class MainWindow : Window
     //https://github.com/rslashplace2/rslashplace2.github.io/blob/1cc30a12f35a6b0938e538100d3337228087d40d/index.html#L531
     private void OnBackgroundWheelChanged(object? sender, PointerWheelEventArgs e)
     {
-        //Board.Left -= (float) (e.GetPosition(this).X - MainGrid.ColumnDefinitions[0].ActualWidth / 2) / 50; //Board.Top -= (float) (e.GetPosition(this).Y - Height / 2) / 50;
-        LookingAtPixel = new Point((float) e.GetPosition(Board).X, (float) e.GetPosition(Board).Y);
+        //Board.Left -= (float) (e.GetPosition(this).X - MainGrid.ColumnDefinitions[0].ActualWidth / 2) / 50;
+        //Board.Top -= (float) (e.GetPosition(this).Y - Height / 2) / 50;
+        LookingAtPixel = new Point((float) e.GetPosition(Board).X * Board.Zoom, (float) e.GetPosition(Board).Y * Board.Zoom);
         Board.Zoom += (float) e.Delta.Y / 10;
     }
 
@@ -790,31 +800,28 @@ public partial class MainWindow : Window
     {
         if (input.StartsWith(":help"))
         {
-            LCVM.AddMessage(new ChatMessage
+            LCVM.CurrentChannel.AddMessage(new ChatMessage
             {
                 Name = "!!",
-                Message = "Commands:\n :help, displays commands,\n`:name username` sets your livechat username",
-                Channel = "en"
+                Message = "Commands:\n :help, displays commands,\n`:name username` sets your livechat username"
             });
         }
         else if (input.StartsWith(":name"))
         {
             viewModel.ChatUsername = ChatInput.Text[5..].Trim();
             
-            LCVM.AddMessage(new ChatMessage
+            LCVM.CurrentChannel.AddMessage(new ChatMessage
             {
                 Name = "!!",
-                Message = "Chat username set to " + viewModel.ChatUsername,
-                Channel = "en"
+                Message = "Chat username set to " + viewModel.ChatUsername
             });
         }
         else if (viewModel.ChatUsername is null)
         {
-            LCVM.AddMessage(new ChatMessage
+            LCVM.CurrentChannel.AddMessage(new ChatMessage
             {
                 Name = "!!",
-                Message = "No chat username set! Use command `:name username`, and use :help for more commands",
-                Channel = "en"
+                Message = "No chat username set! Use command `:name username`, and use :help for more commands"
             });
         }
         else

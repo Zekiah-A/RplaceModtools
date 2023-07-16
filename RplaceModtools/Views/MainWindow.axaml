@@ -333,39 +333,49 @@
                     </ScrollViewer>
                 </TabItem>
                 <TabItem Header="Live chat">
-                    <Grid RowDefinitions="* 4 Auto" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                        <ListBox Grid.Row="0" x:Name="LiveChatListBox" Items="{Binding Messages}" Background="Transparent" VirtualizationMode="Simple">
-                            <ListBox.DataContext><vm:LiveChatViewModel/></ListBox.DataContext>
-                            <ListBox.ItemTemplate>
+                    <Grid x:Name="LiveChatGridContainer" RowDefinitions="* Auto" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                        <Grid.DataContext><vm:LiveChatViewModel></vm:LiveChatViewModel></Grid.DataContext>
+                        <TabControl Grid.Row="0"  Items="{Binding Channels}" SelectedItem="{Binding CurrentChannel}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                            <TabControl.ItemTemplate> <!-- Header -->
                                 <DataTemplate>
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Stretch">
-                                        <StackPanel.ContextMenu>
-                                            <ContextMenu>
-                                                <MenuItem IsVisible="{Binding Uid,
-                                                    Converter={x:Static ObjectConverters.IsNotNull}}"
-                                                    Header="{Binding Uid, StringFormat='Chatter ID: {0}'}"></MenuItem>
-                                                <MenuItem IsVisible="{Binding Uid,
-                                                    Converter={x:Static ObjectConverters.IsNotNull}}"
-                                                    PointerPressed="OnKickChatterPressed"
-                                                    Header="{Binding Name, StringFormat='Kick {0}'}" />
-                                                <MenuItem IsVisible="{Binding Uid,
-                                                    Converter={x:Static ObjectConverters.IsNotNull}}" PointerPressed="OnMuteChatterPressed"
-                                                    Header="{Binding Name, StringFormat='Mute {0}'}" />
-                                                <MenuItem IsEnabled="False" IsVisible="{Binding Uid,
-                                                    Converter={x:Static ObjectConverters.IsNotNull}}"
-                                                    PointerPressed="OnBanChatterPressed" Header="{Binding Name, StringFormat='Ban {0}'}" />
-                                            </ContextMenu>
-                                        </StackPanel.ContextMenu>
-                                        <Border CornerRadius="4" BorderBrush="Black" Padding="2">
-                                            <TextBlock FontWeight="Bold" Foreground="{Binding Path=Name, Converter={StaticResource HashColourConverter}}" Text="{Binding Path=Name}" />
-                                        </Border>
-                                        <TextBlock Margin="4 0 0 0" Text="{Binding Path=Message}"/>
-                                        <!--<TextBlock Text="{Binding Path=Channel}"/>-->
-                                    </StackPanel>
+                                    <TextBlock Text="{Binding ChannelName}" />
                                 </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                        <Grid Grid.Row="2" ColumnDefinitions="*, 4, Auto">
+                            </TabControl.ItemTemplate>
+                            <TabControl.DataTemplates> <!-- Contents -->
+                                <DataTemplate>
+                                    <ListBox Items="{Binding Messages}" Background="Transparent" VirtualizationMode="Simple">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Stretch">
+                                                    <StackPanel.ContextMenu>
+                                                        <ContextMenu>
+                                                            <MenuItem IsVisible="{Binding Uid,
+                                                                Converter={x:Static ObjectConverters.IsNotNull}}"
+                                                                Header="{Binding Uid, StringFormat='Chatter ID: {0}'}"></MenuItem>
+                                                            <MenuItem IsVisible="{Binding Uid,
+                                                                Converter={x:Static ObjectConverters.IsNotNull}}"
+                                                                PointerPressed="OnKickChatterPressed"
+                                                                Header="{Binding Name, StringFormat='Kick {0}'}" />
+                                                            <MenuItem IsVisible="{Binding Uid,
+                                                                Converter={x:Static ObjectConverters.IsNotNull}}" PointerPressed="OnMuteChatterPressed"
+                                                                Header="{Binding Name, StringFormat='Mute {0}'}" />
+                                                            <MenuItem IsEnabled="False" IsVisible="{Binding Uid,
+                                                                Converter={x:Static ObjectConverters.IsNotNull}}"
+                                                                PointerPressed="OnBanChatterPressed" Header="{Binding Name, StringFormat='Ban {0}'}" />
+                                                        </ContextMenu>
+                                                    </StackPanel.ContextMenu>
+                                                    <Border CornerRadius="4" BorderBrush="Black" Padding="2">
+                                                        <TextBlock FontWeight="Bold" Foreground="{Binding Path=Name, Converter={StaticResource HashColourConverter}}" Text="{Binding Path=Name}" />
+                                                    </Border>
+                                                    <TextBlock Margin="4 0 0 0" Text="{Binding Path=Message}"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </DataTemplate>
+                            </TabControl.DataTemplates>
+                        </TabControl>                 
+                        <Grid Grid.Row="1" ColumnDefinitions="*, 4, Auto">
                             <TextBox Grid.Column="0" x:Name="ChatInput" Watermark="Enter a message..." KeyDown="OnChatInputKeyDown"></TextBox>
                             <Button Grid.Column="2" VerticalAlignment="Stretch" Click="OnChatSendPressed">Send</Button>
                         </Grid>
