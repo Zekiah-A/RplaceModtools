@@ -5,13 +5,16 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:views="clr-namespace:RplaceModtools.Views"
         xmlns:rplaceModtools="clr-namespace:RplaceModtools"
+        xmlns:models="clr-namespace:RplaceModtools.Models"
         mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="600" MinWidth="400"
         x:Class="RplaceModtools.Views.MainWindow"
         Icon="/Assets/favicon.ico"
         Title="RplaceModtools"
         TransparencyLevelHint="AcrylicBlur"
-        Background="Transparent">
-    
+        TransparencyBackgroundFallback="DarkGray"
+        Background="DarkGray">
+        <!--Background="Transparent"-->
+        
     <Window.Styles>
         <Style Selector="Image.PlaceLogo">
             <Setter Property="Height" Value="100"/>
@@ -105,6 +108,8 @@
         <rplaceModtools:HashColourConverter x:Key="HashColourConverter" />
         <rplaceModtools:ValueEqualsConverter x:Key="ValueEqualsConverter" />
         <rplaceModtools:ValueNotEqualsConverter x:Key="ValueNotEqualsConverter" />
+        <rplaceModtools:AllTrueConverter x:Key="AllTrueConverter"/>
+        <rplaceModtools:NotConverter x:Key="NotConverter"/>
     </Window.Resources>
     
     <Design.DataContext>
@@ -119,19 +124,45 @@
                     <Label Classes="PlaceTitle">RplaceTK Mod Tools</Label>
                     <StackPanel Classes="PlaceConfig" Margin="10">
                         <TextBlock FontSize="24" Margin="0 0 0 5">Configuration:</TextBlock>
-                        <AutoCompleteBox x:Name="ConfigWsInput" Watermark="Canvas websocket address" Items="{Binding KnownWebsockets}" Text="{Binding CurrentPreset.Websocket}" Margin="0 0 0 5"/>
-                        <AutoCompleteBox x:Name="ConfigFsInput" Watermark="Place file server address" Items="{Binding KnownFileServers}" Text="{Binding CurrentPreset.FileServer}" Margin="0 0 0 5"/>
+                        <AutoCompleteBox Watermark="Canvas websocket address" ItemsSource="{Binding KnownWebsockets}" Text="{Binding CurrentPreset.Websocket}" Margin="0 0 0 5"/>
+                        <AutoCompleteBox Watermark="Place file server address" ItemsSource="{Binding KnownFileServers}" Text="{Binding CurrentPreset.FileServer}" Margin="0 0 0 5"/>
                         <Button x:Name="PresetsAdvancedButton" HorizontalAlignment="Center" Margin="4" Click="OnPresetsAdvancedClicked">Advanced ▼</Button>
-                        <StackPanel x:Name="PresetsAdvancedPanel" IsVisible="false">
-                            <TextBox x:Name="ConfigPlacePathInput" Watermark="Live canvas path" Text="{Binding CurrentPreset.PlacePath}" Margin="0 0 0 5"/>
-                            <TextBox x:Name="ConfigBackupListInput" Watermark="Server backup list path" Text="{Binding CurrentPreset.BackupListPath}" Margin="0 0 0 5"/>
-                            <TextBox x:Name="ConfigBackupsInput" Watermark="Server backups directory path" Text="{Binding CurrentPreset.BackupsPath}" Margin="0 0 0 5"/>
+                        <StackPanel x:Name="PresetsAdvancedPanel" IsVisible="false" Spacing="5">
+                            <ToggleSwitch IsChecked="{Binding CurrentPreset.LegacyServer, Mode=TwoWay}">Legacy server</ToggleSwitch>
+                            <TextBox Watermark="Live canvas path" Text="{Binding CurrentPreset.PlacePath}" />
+                            
+                            <TextBox Watermark="Server backups repository" Text="{Binding CurrentPreset.BackupsRepository}">
+                                <TextBox.IsVisible>
+                                    <Binding Path="CurrentPreset.LegacyServer" Converter="{StaticResource ValueEqualsConverter}">
+                                        <Binding.ConverterParameter>
+                                            <x:Boolean>True</x:Boolean>
+                                        </Binding.ConverterParameter>
+                                    </Binding>
+                                </TextBox.IsVisible>
+                            </TextBox>
+                            <TextBox Watermark="Server backup list path" Text="{Binding CurrentPreset.BackupListPath}">
+                                <TextBox.IsVisible>
+                                    <Binding Path="CurrentPreset.LegacyServer" Converter="{StaticResource ValueEqualsConverter}">
+                                        <Binding.ConverterParameter>
+                                            <x:Boolean>False</x:Boolean>
+                                        </Binding.ConverterParameter>
+                                    </Binding>
+                                </TextBox.IsVisible>
+                            </TextBox>
+                            <TextBox Watermark="Server backups directory path" Text="{Binding CurrentPreset.BackupsPath}">
+                                <TextBox.IsVisible>
+                                    <Binding Path="CurrentPreset.LegacyServer" Converter="{StaticResource ValueEqualsConverter}">
+                                        <Binding.ConverterParameter>
+                                            <x:Boolean>False</x:Boolean>
+                                        </Binding.ConverterParameter>
+                                    </Binding>
+                                </TextBox.IsVisible>
+                            </TextBox>
                         </StackPanel>
                         <TextBlock FontSize="18" Margin="0 0 0 5">Client</TextBlock>
                         <TextBox x:Name="ConfigAdminKeyInput" RevealPassword="False" PasswordChar="*" Watermark="Admin key" Text="{Binding CurrentPreset.AdminKey}" Margin="0 0 0 5"/>
                         <ScrollViewer>
-                            <ListBox x:Name="ServerPresetListBox" Items="{Binding ServerPresets}" SelectionChanged="OnServerPresetsSelectionChanged">
-                                <ListBox.DataContext><vm:ServerPresetViewModel/></ListBox.DataContext>
+                            <ListBox ItemsSource="{Binding ServerPresets}" SelectedItem="{Binding CurrentPreset, Mode=OneWayToSource}">
                                 <ListBox.Styles>
                                     <Style Selector="ListBox">
                                         <Setter Property="Background" Value="Transparent"></Setter>
@@ -195,24 +226,59 @@
         <Border Grid.Column="0" Grid.ColumnSpan="2" x:Name="ActionConfigPanel" IsVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Width="380" Background="White" BorderBrush="Gray" BorderThickness="1" CornerRadius="8" ZIndex="8">
             <StackPanel Margin="8" Spacing="4">
                 <TextBlock FontSize="24">Manage user:</TextBlock>
+                <TextBox Text="{Binding CurrentModerationUid}"
+                    IsVisible="{Binding CurrentModerationAll,
+                        Converter={StaticResource NotConverter}}" Watermark="Player uid"></TextBox>
+                
+                <ToggleSwitch IsVisible="{Binding CurrentModerationAction,
+                    Converter={StaticResource ValueEqualsConverter},
+                    ConverterParameter = {x:Static rplaceModtools:ModerationAction.Captcha}, Mode=TwoWay}"
+                    IsChecked="{Binding CurrentModerationAll}">
+                    <!-- Long story
+                    <ToggleSwitch.IsChecked>
+                        <MultiBinding Converter="{StaticResource AllTrueConverter}">
+                            <Binding Path="CurrentModerationAll" />
+                            <Binding Path="CurrentModerationAction"
+                                     Mode="OneWay"
+                                     Converter="{StaticResource ValueEqualsConverter}"
+                                     ConverterParameter="{x:Static rplaceModtools:ModerationAction.Captcha}" />
+                        </MultiBinding>
+                    </ToggleSwitch.IsChecked>
+                    -->
+                    All clients
+                </ToggleSwitch>
                 <StackPanel>
                     <TextBlock FontWeight="Bold">Action:</TextBlock>
                     <RadioButton IsChecked="{Binding CurrentModerationAction,
                             Converter={StaticResource ValueEqualsConverter},
-                            ConverterParameter={x:Static rplaceModtools:ModerationAction.Kick}, Mode=OneWay}"
-                        IsHitTestVisible="False">Kick</RadioButton>
+                            ConverterParameter={x:Static rplaceModtools:ModerationAction.Kick}}"
+                        >Kick</RadioButton>
                     <RadioButton IsChecked="{Binding CurrentModerationAction,
                             Converter={StaticResource ValueEqualsConverter},
-                            ConverterParameter = {x:Static rplaceModtools:ModerationAction.Mute}, Mode=OneWay}"
-                        IsHitTestVisible="False">Mute</RadioButton>
+                            ConverterParameter = {x:Static rplaceModtools:ModerationAction.Mute}}"
+                        >Mute</RadioButton>
                     <RadioButton IsChecked="{Binding CurrentModerationAction,
                             Converter={StaticResource ValueEqualsConverter},
-                            ConverterParameter = {x:Static rplaceModtools:ModerationAction.Ban}, Mode=OneWay}"
-                        IsHitTestVisible="False">Ban</RadioButton>
+                            ConverterParameter = {x:Static rplaceModtools:ModerationAction.Ban}}"
+                        >Ban</RadioButton>
+                    <RadioButton IsChecked="{Binding CurrentModerationAction,
+                            Converter={StaticResource ValueEqualsConverter},
+                            ConverterParameter = {x:Static rplaceModtools:ModerationAction.Captcha}}"
+                        >Captcha solve</RadioButton>
                 </StackPanel>
-                <StackPanel IsVisible="{Binding CurrentModerationAction,
-                    Converter={StaticResource ValueNotEqualsConverter},
-                    ConverterParameter = {x:Static rplaceModtools:ModerationAction.Kick}, Mode=OneWay}">
+                <StackPanel>
+                    <StackPanel.IsVisible>
+                        <MultiBinding Converter="{StaticResource AllTrueConverter}">
+                            <Binding Path="CurrentModerationAction"
+                                 Converter="{StaticResource ValueNotEqualsConverter}"
+                                 ConverterParameter="{x:Static rplaceModtools:ModerationAction.Kick}">
+                            </Binding>
+                            <Binding Path="CurrentModerationAction"
+                                     Converter="{StaticResource ValueNotEqualsConverter}"
+                                     ConverterParameter="{x:Static rplaceModtools:ModerationAction.Captcha}">
+                            </Binding>
+                        </MultiBinding>
+                    </StackPanel.IsVisible>
                     <TextBlock FontWeight="Bold">Duration (hours, minutes):</TextBlock>
                     <TimePicker SelectedTime="{Binding CurrentModerationDuration}"></TimePicker>
                 </StackPanel>
@@ -257,7 +323,7 @@
             <DockPanel ZIndex="8" Dock="Bottom" Height="150" VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Background="White" IsVisible="False" x:Name="Palette">
                 <Grid RowDefinitions="* Auto">
                     <ScrollViewer Grid.Row="0">
-                        <ListBox x:Name="PaletteListBox" Items="{Binding AvColours}" HorizontalAlignment="Stretch" VerticalAlignment="Top" SelectionChanged="OnPaletteSelectionChanged" SelectedIndex="{Binding CurrentColour}" Background="Transparent">
+                        <ListBox x:Name="PaletteListBox" ItemsSource="{Binding AvColours}" HorizontalAlignment="Stretch" VerticalAlignment="Top" SelectedIndex="{Binding CurrentColour}" Background="Transparent">
                             <ListBox.DataContext><vm:PaletteViewModel/></ListBox.DataContext>
                             <ListBox.Styles>
                                 <Style Selector="ListBoxItem">
@@ -288,13 +354,12 @@
                     <ScrollViewer>
                         <StackPanel>
                             <TextBlock FontSize="18">Canvas:</TextBlock>
-                            <AutoCompleteBox Margin="5" Watermark="Switch canvas/server" Items="{Binding KnownWebsockets}" IsEnabled="False"/>
-                            <ComboBox Margin="5" SelectedIndex="0" x:Name="CanvasDropdown" VirtualizationMode="Simple" SelectionChanged="OnCanvasDropdownSelectionChanged">
+                            <AutoCompleteBox Margin="5" Watermark="Switch canvas/server" ItemsSource="{Binding KnownWebsockets}" IsEnabled="False"/>
+                            <ComboBox Margin="5" SelectedIndex="0" ItemsSource="{Binding Backups}" x:Name="CanvasDropdown" SelectionChanged="OnCanvasDropdownSelectionChanged"> <!--TODO: Virtualize -->
                                 <ToolTip.Tip>Select a previous backup of the canvas for viewing and rollback.</ToolTip.Tip>
-                                <ComboBoxItem>place</ComboBoxItem>
                             </ComboBox>
                             <Panel Margin="5 0 5 0">
-                                <Image x:Name="PreviewImg" Source="../Assets/preview_default.png" RenderOptions.BitmapInterpolationMode="Default"/>
+                                <Image x:Name="PreviewImg" Source="../Assets/preview_default.png" RenderOptions.BitmapInterpolationMode="None"/>
                                     <Grid ColumnDefinitions="Auto, Auto, *" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Background="White">
                                         <Button Grid.Column="0" Margin="4" IsEnabled="False">Previous</Button>
                                         <Button Grid.Column="1" Margin="4" IsEnabled="False">Next</Button>
@@ -322,11 +387,11 @@
                             </Grid>
                             <ToggleSwitch x:Name="ViewSelectedBackup" Margin="5" Checked="OnViewSelectedBackupChecked" Unchecked="OnViewSelectedBackupUnchecked"><ToolTip.Tip>By turning this on, instead of viewing the whole canvas as the backup, only the area within your selection would peek through to the backup, allowing for easier visualisations of your rollback.</ToolTip.Tip>View selected area at backup</ToggleSwitch>
                             <Grid ColumnDefinitions="* Auto">
-                                <Button Grid.Column="0" Margin="5" HorizontalAlignment="Stretch">
+                                <Button Grid.Column="0" Margin="5" HorizontalAlignment="Stretch" Click="OnRollbackButtonClicked">
                                     <ToolTip.Tip>Revert the selected area of the canvas to a previous date.</ToolTip.Tip>Rollback selected area
                                 </Button>
-                                <Button Grid.Column="1" Margin="5" HorizontalAlignment="Stretch">
-                                    <ToolTip.Tip>Load a place file from your local device for rollback (not yet implemented).</ToolTip.Tip>📂
+                                <Button Grid.Column="1" Margin="5" HorizontalAlignment="Stretch" Click="OnLoadLocalClicked">
+                                    <ToolTip.Tip>Load a place file from your local device for rollback</ToolTip.Tip>📂
                                 </Button>
                             </Grid>
                         </StackPanel>
@@ -335,40 +400,40 @@
                 <TabItem Header="Live chat">
                     <Grid x:Name="LiveChatGridContainer" RowDefinitions="* Auto" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                         <Grid.DataContext><vm:LiveChatViewModel></vm:LiveChatViewModel></Grid.DataContext>
-                        <TabControl Grid.Row="0"  Items="{Binding Channels}" SelectedItem="{Binding CurrentChannel}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                        <TabControl x:Name="LiveChatTabs" Grid.Row="0"  ItemsSource="{Binding Channels}" SelectedItem="{Binding CurrentChannel}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                             <TabControl.ItemTemplate> <!-- Header -->
                                 <DataTemplate>
                                     <TextBlock Text="{Binding ChannelName}" />
                                 </DataTemplate>
                             </TabControl.ItemTemplate>
                             <TabControl.DataTemplates> <!-- Contents -->
-                                <DataTemplate>
-                                    <ListBox Items="{Binding Messages}" Background="Transparent" VirtualizationMode="Simple">
+                                <DataTemplate DataType="{x:Type vm:LiveChatChannelViewModel}">
+                                    <ListBox ItemsSource="{Binding Messages}"
+                                             Background="Transparent"> <!--VirtualizationMode="Simple" TODO: Virtualize -->
                                         <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Stretch">
-                                                    <StackPanel.ContextMenu>
+                                            <DataTemplate DataType="{x:Type models:ChatMessage}">
+                                                <TextBlock TextWrapping="Wrap">
+                                                    <TextBlock.ContextMenu>
                                                         <ContextMenu>
                                                             <MenuItem IsVisible="{Binding Uid,
-                                                                Converter={x:Static ObjectConverters.IsNotNull}}"
-                                                                Header="{Binding Uid, StringFormat='Chatter ID: {0}'}"></MenuItem>
+                                                            Converter={x:Static ObjectConverters.IsNotNull}}"
+                                                                      Header="{Binding Uid, StringFormat='Chatter ID: {0}'}"></MenuItem>
                                                             <MenuItem IsVisible="{Binding Uid,
-                                                                Converter={x:Static ObjectConverters.IsNotNull}}"
-                                                                PointerPressed="OnKickChatterPressed"
-                                                                Header="{Binding Name, StringFormat='Kick {0}'}" />
+                                                            Converter={x:Static ObjectConverters.IsNotNull}}"
+                                                                      PointerPressed="OnKickChatterPressed"
+                                                                      Header="{Binding Name, StringFormat='Kick {0}'}" />
                                                             <MenuItem IsVisible="{Binding Uid,
-                                                                Converter={x:Static ObjectConverters.IsNotNull}}" PointerPressed="OnMuteChatterPressed"
-                                                                Header="{Binding Name, StringFormat='Mute {0}'}" />
+                                                            Converter={x:Static ObjectConverters.IsNotNull}}" PointerPressed="OnMuteChatterPressed"
+                                                                      Header="{Binding Name, StringFormat='Mute {0}'}" />
                                                             <MenuItem IsEnabled="False" IsVisible="{Binding Uid,
-                                                                Converter={x:Static ObjectConverters.IsNotNull}}"
-                                                                PointerPressed="OnBanChatterPressed" Header="{Binding Name, StringFormat='Ban {0}'}" />
+                                                            Converter={x:Static ObjectConverters.IsNotNull}}"
+                                                                      PointerPressed="OnBanChatterPressed" Header="{Binding Name, StringFormat='Ban {0}'}" />
                                                         </ContextMenu>
-                                                    </StackPanel.ContextMenu>
-                                                    <Border CornerRadius="4" BorderBrush="Black" Padding="2">
-                                                        <TextBlock FontWeight="Bold" Foreground="{Binding Path=Name, Converter={StaticResource HashColourConverter}}" Text="{Binding Path=Name}" />
-                                                    </Border>
-                                                    <TextBlock Margin="4 0 0 0" Text="{Binding Path=Message}"/>
-                                                </StackPanel>
+                                                    </TextBlock.ContextMenu>
+
+                                                    <Run FontWeight="Bold" Foreground="{Binding Path=Name, Converter={StaticResource HashColourConverter}}" Text="{Binding Path=Name}" />
+                                                    <Run Text="{Binding Path=Message}" />
+                                                </TextBlock>
                                             </DataTemplate>
                                         </ListBox.ItemTemplate>
                                     </ListBox>
@@ -395,6 +460,7 @@
                         </MenuItem>
                         <MenuItem Header="See application logs" IsEnabled="False"/>
                         <MenuItem Header="Check for updates" IsEnabled="False"/>
+                        <MenuItem Header="Moderate user" PointerPressed="OnModerateUserPressed"/>
                         <MenuItem Header="About">
                             <TextBlock>
                                     Rplace modtools 

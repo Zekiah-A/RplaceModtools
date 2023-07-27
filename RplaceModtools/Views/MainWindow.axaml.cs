@@ -1,8 +1,9 @@
 using System.Buffers.Binary;
-using System.Collections;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Text;
+using System.Text.RegularExpressions;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia;
@@ -10,9 +11,9 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
-using Avalonia.Platform;
-using Avalonia.Themes.Fluent;
 using Avalonia.Threading;
+using DynamicData;
+using LibGit2Sharp;
 using Microsoft.Extensions.DependencyInjection;
 using RplaceModtools.Models;
 using SkiaSharp;
@@ -32,11 +33,10 @@ public partial class MainWindow : Window
     private readonly Cursor cross = new(StandardCursorType.Cross);
     private WebsocketClient? socket;
     private TaskCompletionSource<byte[]> boardFetchSource = new();
-    
+        
     private MainWindowViewModel viewModel;
     //TODO: Switch these to using dependency injection
     private PaletteViewModel PVM => (PaletteViewModel) PaletteListBox.DataContext!;
-    private ServerPresetViewModel SPVM => (ServerPresetViewModel) ServerPresetListBox.DataContext!;
     private LiveChatViewModel LCVM => (LiveChatViewModel) LiveChatGridContainer.DataContext!;
     
     private Point LookingAtPixel
@@ -59,8 +59,8 @@ public partial class MainWindow : Window
     }
 
     private Point MouseOverPixel(PointerEventArgs e) => new(
-        (int) Math.Clamp(Math.Floor(e.GetPosition(CanvasBackground).X - Board.Left), 0, Board.CanvasWidth),
-        (int) Math.Clamp(Math.Floor(e.GetPosition(CanvasBackground).Y - Board.Top), 0, Board.CanvasHeight)
+        (int) Math.Clamp(Math.Floor(e.GetPosition(CanvasBackground).X - Board.Left * Board.Zoom), 0, Board.CanvasWidth),
+        (int) Math.Clamp(Math.Floor(e.GetPosition(CanvasBackground).Y - Board.Top * Board.Zoom), 0, Board.CanvasHeight)
     );
 
     public MainWindow()
@@ -81,12 +81,14 @@ public partial class MainWindow : Window
             if (size.Width > 500)
             {
                 if (ToolsPanel.Classes.Contains("ToolsPanelClose")) return;
-                ToolsPanel.Classes = Classes.Parse("ToolsPanelClose");
+                ToolsPanel.Classes.Add("ToolsPanelClose");
+                ToolsPanel.Classes.Remove("ToolsPanelOpen");
             }
             else
             {
                 if (ToolsPanel.Classes.Contains("ToolsPanelOpen")) return;
-                ToolsPanel.Classes = Classes.Parse("ToolsPanelOpen");
+                ToolsPanel.Classes.Add("ToolsPanelOpen");
+                ToolsPanel.Classes.Remove("ToolsPanelClose");
             }
         });
     }
@@ -208,13 +210,19 @@ public partial class MainWindow : Window
                         Dispatcher.UIThread.Post(() =>
                         {
                             var channelViewModel = LCVM.Channels.FirstOrDefault(channel => channel.ChannelName == channelName);
+
                             if (channelViewModel is null)
                             {
                                 channelViewModel = new LiveChatChannelViewModel(channelName);
                                 LCVM.Channels.Add(channelViewModel);
                             }
+
+                            if (channelViewModel.Messages.Count > 100)
+                            {
+                                channelViewModel.Messages.RemoveAt(0);
+                            }
                             
-                            channelViewModel.AddMessage(new ChatMessage
+                            channelViewModel.Messages.Add(new ChatMessage
                             {
                                 Message = message,
                                 Name = name,
@@ -235,42 +243,73 @@ public partial class MainWindow : Window
         await socket.Start();
     }
 
-    /*private void RollbackArea(int x, int y, int w, int h, byte[] rollbackBoard)
+    private void RollbackArea(int x, int y, int regionWidth, int regionHeight, byte[] rollbackBoard)
     {
-        if (w > 250 || h > 250 || x >= Board.CanvasWidth || y >= Board.CanvasHeight) return;
-        var buffer = new byte[Board.CanvasWidth ?? 500 * Board.CanvasHeight ?? 500 + 7];
-        var i = x + y * Board.CanvasWidth ?? 500;
-        new byte[] {99, (byte) w, (byte) h, (byte) (i >> 24), (byte) (i >> 16), (byte) (i >> 8), (byte) i}.CopyTo(buffer, 0);
-        
-        for (var hi = 0; hi < h; hi++)
+        // TODO: This check is very very flawed
+        if (regionWidth > 250 || regionHeight > 250 || x >= Board.CanvasWidth || y >= Board.CanvasHeight)
         {
-            BinaryPrimitives.WriteInt32BigEndian(rollbackBoard.AsSpan().Slice(i, i + w),hi * w + 7);
-            rollbackBoard[i..(i + w)].CopyTo(buffer, hi * w + 7);
-            i += Board.CanvasWidth ?? 500;
-        }
-        
-        if (socket is {IsRunning: true}) socket.Send(buffer);
-    }*/
-
-    private async Task FetchCacheBackupList()
-    {
-        var backupsUri = UriCombine(viewModel.CurrentPreset.FileServer!, viewModel.CurrentPreset.BackupListPath);
-        var response = await Fetch(backupsUri);
-        if (response is null)
-        {
-            Dispatcher.UIThread.Post(() =>
-            {
-                CanvasDropdown.Items = new[] { "place" };
-            });
             return;
         }
         
-        var responseBody = await response.Content.ReadAsStringAsync();
-        var stack = new Stack(responseBody.Split("\n"));
-        stack.Pop();
-        stack.Push("place");
-        var backupArr = (object[]) stack.ToArray();
-        CanvasDropdown.Items = backupArr;
+        var buffer = new byte[7 + Board.CanvasWidth * Board.CanvasHeight];
+        var i = (int) (x + y * Board.CanvasWidth);
+        
+        // Setting up first 7 bytes of metadata
+        new byte[]
+        {
+            99, (byte) regionWidth, (byte) regionHeight, (byte) (i >> 24), (byte) (i >> 16), (byte) (i >> 8), (byte) i
+        }.CopyTo(buffer, 0);
+        
+        // Copy over just that region of the board into the buffer we send to server
+        for (var row = 0; row < regionHeight; row++)
+        {
+            Buffer.BlockCopy(rollbackBoard, i, buffer, row * regionWidth + 7, i + regionWidth);
+            i += (int) Board.CanvasWidth;
+        }
+
+        if (socket is { IsRunning: true })
+        {
+            socket.Send(buffer);
+        }
+    }
+    
+    private async Task FetchCacheBackupList()
+    {
+        if (viewModel.CurrentPreset.LegacyServer)
+        {
+            var nameMatches = RepositoryNameRegex().Match(viewModel.CurrentPreset.BackupsRepository).Groups.Values.First();
+            var invalidChars = new string(Path.GetInvalidFileNameChars());
+            var safeRepositoryName = Regex.Replace(nameMatches.Value, $"[{Regex.Escape(invalidChars)}]", "_");
+            
+            var localPath = Path.Join(MainWindowViewModel.ProgramDirectory, safeRepositoryName);
+            if (!Directory.Exists(localPath))
+            {
+                Repository.Clone(viewModel.CurrentPreset.BackupsRepository, localPath, new CloneOptions
+                {
+                    BranchName = "main",
+                });
+            }
+            
+            using var backupsRepository = new Repository(localPath);
+            var commits = backupsRepository.Commits.QueryBy(viewModel.CurrentPreset.PlacePath)
+                .Select(commit => commit.Commit.Id.Sha).ToList();
+            
+            viewModel.Backups = new ObservableCollection<string> { "place" };
+            viewModel.Backups.AddRange(commits);
+        }
+        else
+        {
+            var backupsUri = UriCombine(viewModel.CurrentPreset.FileServer!, viewModel.CurrentPreset.BackupListPath);
+            var response = await Fetch(backupsUri);
+            viewModel.Backups = new ObservableCollection<string> { "place" };
+            if (response is null)
+            {
+                return;
+            }
+        
+            var responseBody = await response.Content.ReadAsStringAsync();
+            viewModel.Backups.AddRange(responseBody.Split("\n"));
+        }
     }
     
     private async Task<HttpResponseMessage?> Fetch(Uri uri)
@@ -341,13 +380,13 @@ public partial class MainWindow : Window
     private async void OnStartButtonPressed(object? sender, RoutedEventArgs e)
     {
         //Configure the current session's data
-        if (!ServerPresetViewModel.ServerPresetExists(viewModel.CurrentPreset))
+        if (!MainWindowViewModel.ServerPresetExists(viewModel.CurrentPreset))
         {
-            ServerPresetViewModel.SaveServerPreset(viewModel.CurrentPreset);
+            MainWindowViewModel.SaveServerPreset(viewModel.CurrentPreset);
         }
         
         //UI and connections
-        _ = CreateConnection(UriCombine(viewModel.CurrentPreset.Websocket.ToString(), viewModel.CurrentPreset.AdminKey));
+        _ = CreateConnection(UriCombine(viewModel.CurrentPreset.Websocket, viewModel.CurrentPreset.AdminKey));
         _ = Task.Run(async () =>
         {
             var boardPath = UriCombine(viewModel.CurrentPreset.FileServer,
@@ -365,16 +404,12 @@ public partial class MainWindow : Window
         });
         PlaceConfigPanel.IsVisible = false;
         DownloadBtn.IsEnabled = true;
-
-        //Backup loading
+        
         await FetchCacheBackupList();
         CanvasDropdown.SelectedIndex = 0;
         BackupCheckInterval();
     }
-
-    private void OnServerPresetsSelectionChanged(object? sender, SelectionChangedEventArgs args) =>
-        viewModel!.CurrentPreset = SPVM.ServerPresets[ServerPresetListBox.SelectedIndex];
-
+    
     private void OnBackgroundMouseDown(object? sender, PointerPressedEventArgs e)
     {
         if (e.Source is null || !e.Source.Equals(CanvasBackground)) return; //stop bubbling
@@ -495,8 +530,10 @@ public partial class MainWindow : Window
     {
         //Board.Left -= (float) (e.GetPosition(this).X - MainGrid.ColumnDefinitions[0].ActualWidth / 2) / 50;
         //Board.Top -= (float) (e.GetPosition(this).Y - Height / 2) / 50;
-        LookingAtPixel = new Point((float) e.GetPosition(Board).X * Board.Zoom, (float) e.GetPosition(Board).Y * Board.Zoom);
+        //LookingAtPixel = new Point((float) e.GetPosition(Board).X * Board.Zoom, (float) e.GetPosition(Board).Y * Board.Zoom);
+        var pos = LookingAtPixel;
         Board.Zoom += (float) e.Delta.Y / 10;
+        LookingAtPixel = pos;
     }
 
     private void OnCanvasDropdownSelectionChanged(object? _, SelectionChangedEventArgs e)
@@ -522,7 +559,9 @@ public partial class MainWindow : Window
     /// </summary>
     private async Task ViewCanvasAtBackup(string backupName)
     {
-        var backupUri = UriCombine(viewModel.CurrentPreset.FileServer, viewModel.CurrentPreset.BackupsPath, backupName);
+        var backupUri = viewModel.CurrentPreset.LegacyServer ?
+            UriCombine(viewModel.CurrentPreset.FileServer, backupName, viewModel.CurrentPreset.PlacePath)
+            : UriCombine(viewModel.CurrentPreset.FileServer, viewModel.CurrentPreset.BackupsPath, backupName);
         PreviewImg.Source = await CreateCanvasPreviewImage(backupUri) ?? new Bitmap("../Assets/preview_default.png");
         var boardResponse = await Fetch(backupUri);
         if (boardResponse is not null)
@@ -553,7 +592,10 @@ public partial class MainWindow : Window
             Board.Board = await boardResponse.Content.ReadAsByteArrayAsync(); 
         }
         
-        var backupUri = UriCombine(viewModel.CurrentPreset.FileServer, viewModel.CurrentPreset.BackupsPath, backupName);
+        var backupUri = viewModel.CurrentPreset.LegacyServer ?
+            // TODO: Remove hard code for this and make it part of the preset, something like git raw path
+            UriCombine(viewModel.CurrentPreset.FileServer, backupName, viewModel.CurrentPreset.PlacePath)
+            : UriCombine(viewModel.CurrentPreset.FileServer, viewModel.CurrentPreset.BackupsPath, backupName);
         Board.ClearSelections();
         var backupResponse = await Fetch(backupUri);
         if (boardResponse is not null)
@@ -695,8 +737,9 @@ public partial class MainWindow : Window
 
     private void OnToggleThemePressed(object? sender, RoutedEventArgs e)
     {
-        var currentStyle = (FluentTheme) Application.Current?.Styles[0]!;
-        currentStyle.Mode = currentStyle.Mode == FluentThemeMode.Dark ? FluentThemeMode.Light : FluentThemeMode.Dark;
+        // TODO: Fix light/dark theme
+        //var currentStyle = (FluentTheme) Application.Current?.Styles[0]!;
+        //currentStyle.Mode = currentStyle.Mode == FluentThemeMode.Dark ? FluentThemeMode.Light : FluentThemeMode.Dark;
     }
 
     private void OnOpenGithubClicked(object? sender, RoutedEventArgs e)
@@ -723,10 +766,14 @@ public partial class MainWindow : Window
 
     private void OnRollbackButtonClicked(object? sender, RoutedEventArgs e)
     {
-        if (Board.SelectionBoard is null) return;
+        if (Board.SelectionBoard is null)
+        {
+            return;
+        }
+        
         var sel = Board.Selections.Peek();
-        //RollbackArea((int) sel.TopLeft.X, (int) sel.TopLeft.Y, (int) sel.BottomRight.X - (int) sel.TopLeft.X,
-        //(int) sel.BottomRight.Y - (int) sel.TopLeft.Y, Board.SelectionBoard);
+        RollbackArea((int) sel.TopLeft.X, (int) sel.TopLeft.Y, (int) sel.BottomRight.X - (int) sel.TopLeft.X, 
+            (int) sel.BottomRight.Y - (int) sel.TopLeft.Y, Board.SelectionBoard);
     }
 
     private void BackupCheckInterval()
@@ -800,7 +847,7 @@ public partial class MainWindow : Window
     {
         if (input.StartsWith(":help"))
         {
-            LCVM.CurrentChannel.AddMessage(new ChatMessage
+            LCVM.CurrentChannel.Messages.Add(new ChatMessage
             {
                 Name = "!!",
                 Message = "Commands:\n :help, displays commands,\n`:name username` sets your livechat username"
@@ -810,7 +857,7 @@ public partial class MainWindow : Window
         {
             viewModel.ChatUsername = ChatInput.Text[5..].Trim();
             
-            LCVM.CurrentChannel.AddMessage(new ChatMessage
+            LCVM.CurrentChannel.Messages.Add(new ChatMessage
             {
                 Name = "!!",
                 Message = "Chat username set to " + viewModel.ChatUsername
@@ -818,7 +865,7 @@ public partial class MainWindow : Window
         }
         else if (viewModel.ChatUsername is null)
         {
-            LCVM.CurrentChannel.AddMessage(new ChatMessage
+            LCVM.CurrentChannel.Messages.Add(new ChatMessage
             {
                 Name = "!!",
                 Message = "No chat username set! Use command `:name username`, and use :help for more commands"
@@ -829,7 +876,7 @@ public partial class MainWindow : Window
             var chatBuilder = new StringBuilder();
             chatBuilder.AppendLine(input);
             chatBuilder.AppendLine(viewModel.ChatUsername);
-            chatBuilder.AppendLine("en");
+            chatBuilder.AppendLine(LCVM.CurrentChannel.ChannelName);
             chatBuilder.AppendLine("live");
             chatBuilder.AppendLine("0");
             chatBuilder.AppendLine("0");
@@ -837,6 +884,14 @@ public partial class MainWindow : Window
         }
     }
     
+    private void OnModerateUserPressed(object? sender, PointerPressedEventArgs e)
+    {
+        
+        ActionConfigPanel.IsVisible = true;
+        viewModel.CurrentModerationAction = ModerationAction.None;
+        viewModel.CurrentModerationUid = "";
+    }
+
     private void OnKickChatterPressed(object? sender, PointerPressedEventArgs e)
     {
         if (sender is not MenuItem { DataContext: ChatMessage message })
@@ -918,6 +973,26 @@ public partial class MainWindow : Window
                 socket?.Send(muteBuffer);
                 break;
             }
+            case ModerationAction.Captcha:
+            {
+                var reasonBytes = Encoding.UTF8.GetBytes(viewModel.CurrentModerationReason);
+                var uidBytes = (byte[]?) null;
+                var uidBytesLength = 0;
+                if (!viewModel.CurrentModerationAll)
+                {
+                    uidBytes = Encoding.UTF8.GetBytes(viewModel.CurrentModerationUid);
+                    uidBytesLength = uidBytes.Length;
+                }
+
+                var captchaBuffer = new byte[3 + (uidBytes?.Length ?? 0) + reasonBytes.Length];
+                captchaBuffer[0] = 98;
+                captchaBuffer[1] = (byte) ModerationAction.Captcha;
+                captchaBuffer[2] = (byte) uidBytesLength;
+                uidBytes?.CopyTo(captchaBuffer, 3);
+                reasonBytes.CopyTo(captchaBuffer, 3 + uidBytesLength);
+                socket?.Send(captchaBuffer);
+                break;
+            }
         }
         
         ResetCurrentModerationAction();
@@ -934,4 +1009,12 @@ public partial class MainWindow : Window
         viewModel.CurrentModerationAction = ModerationAction.None;
         viewModel.CurrentModerationUid = "";
     }
+
+    private void OnLoadLocalClicked(object? sender, RoutedEventArgs e)
+    {
+        throw new NotImplementedException();
+    }
+
+    [GeneratedRegex(@"github.com\/[\w\-]+\/([\w\-]+)")]
+    private static partial Regex RepositoryNameRegex();
 }

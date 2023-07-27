@@ -14,9 +14,4 @@ public partial class LiveChatChannelViewModel : ObservableObject
         channelName = channel;
         messages = new ObservableCollection<ChatMessage>();
     }
-
-    public void AddMessage(ChatMessage message)
-    {
-        messages.Add(message);
-    }
 }

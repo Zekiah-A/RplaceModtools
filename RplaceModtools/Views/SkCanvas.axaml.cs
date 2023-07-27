@@ -118,6 +118,7 @@ public partial class SkCanvas : UserControl
     private class CustomDrawOp : ICustomDrawOperation
     {
         private SkCanvas ParentSk { get; }
+
         public Rect Bounds { get; }
 
         public CustomDrawOp(Rect bounds, SkCanvas parentSk)
@@ -130,14 +131,16 @@ public partial class SkCanvas : UserControl
         public bool HitTest(Point p) => false;
         public bool Equals(ICustomDrawOperation? other) => false;
         
-        public void Render(IDrawingContextImpl context)
+        public void Render(ImmediateDrawingContext context)
         {
-            //Console.WriteLine("Drawing " + DateTime.Now + " " + Thread.GetCurrentProcessorId());
-            var canvas = (context as ISkiaDrawingContextImpl)?.SkCanvas;
-            if (canvas == null)
+            var leaseFeature = context.TryGetFeature<ISkiaSharpApiLeaseFeature>();
+            if (leaseFeature == null)
             {
-                throw new Exception("[Fatal] Render Error: SkCanvas was null, perhaps not using skia as render backend?");
+                Console.WriteLine("[ERROR] Could not get ISkiaSharpApiLeaseFeature feature. Perhaps rendering backend is not skia?");
+                return;
             }
+            using var lease = leaseFeature.Lease();
+            var canvas = lease.SkCanvas;
             canvas.Save();
             
             //These must happen first because apparently it just works that way, idk.

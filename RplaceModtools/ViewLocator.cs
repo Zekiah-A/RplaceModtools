@@ -1,17 +1,18 @@
-using System;
 using System.ComponentModel;
-using System.Text;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
-using RplaceModtools.ViewModels;
-using RplaceModtools.Views;
 
 namespace RplaceModtools
 {
     public class ViewLocator : IDataTemplate
     {
-        public IControl Build(object data)
+        public Control Build(object? data) // TODO: Was IControl
         {
+            if (data is null)
+            {
+                return new TextBlock {Text = "Not Found: data was null"};
+            }
+            
             var name = data.GetType().FullName!
                 .Replace("ViewModels", "Views")
                 .Replace("ViewModel", "");
@@ -21,10 +22,11 @@ namespace RplaceModtools
             {
                 return (Control) Activator.CreateInstance(type)!;
             }
+            
             return new TextBlock {Text = "Not Found: " + name};
         }
 
-        public bool Match(object data)
+        public bool Match(object? data)
         {
             return data is INotifyPropertyChanged;
         }
