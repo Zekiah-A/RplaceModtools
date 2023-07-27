@@ -168,11 +168,15 @@ public partial class SkCanvas : UserControl
                 
                 changesCache = SKImage.FromBitmap(img);
             }
-            
-            if (changesCache is not null && boardCache is not null)
+
+            if (boardCache is not null)
             {
-                canvas.DrawImage(changesCache, 0, 0);
                 canvas.DrawImage(boardCache, 0, 0);
+                
+                if (changesCache is not null)
+                {
+                    canvas.DrawImage(changesCache, 0, 0);
+                }
             }
             else
             {

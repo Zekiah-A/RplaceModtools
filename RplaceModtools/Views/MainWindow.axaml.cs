@@ -12,6 +12,7 @@ using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
+using CommunityToolkit.Mvvm.ComponentModel.__Internals;
 using DynamicData;
 using LibGit2Sharp;
 using Microsoft.Extensions.DependencyInjection;
@@ -291,7 +292,28 @@ public partial class MainWindow : Window
             }
             
             using var backupsRepository = new Repository(localPath);
-            var commits = backupsRepository.Commits.QueryBy(viewModel.CurrentPreset.PlacePath)
+            var signature = new Signature("RplaceModtools", "rplacemodtools@unknown.com", DateTimeOffset.Now);
+            var mergeResult = Commands.Pull(backupsRepository, signature, new PullOptions());
+            /*
+            var refSpec = string.Format("refs/heads/{2}:refs/remotes/{0}/{1}", "origin", "main", "main");
+             * new[] { refSpec }, new FetchOptions
+            {
+                TagFetchMode = TagFetchMode.None,
+            }, null
+             */
+            if (mergeResult.Status == MergeStatus.Conflicts)
+            {
+                Console.WriteLine($"Merge failed - serious file conflict. Try deleting local backups repository? ${localPath}");
+            }
+            /*else
+            {
+                backupsRepository.Commit("Merge changes from remote", signature, signature);
+            }*/
+            
+            var placePath = viewModel.CurrentPreset.PlacePath.StartsWith("/") 
+                ? viewModel.CurrentPreset.PlacePath[1..]
+                : viewModel.CurrentPreset.PlacePath;
+            var commits = backupsRepository.Commits.QueryBy(placePath)
                 .Select(commit => commit.Commit.Id.Sha).ToList();
             
             viewModel.Backups = new ObservableCollection<string> { "place" };
@@ -536,20 +558,30 @@ public partial class MainWindow : Window
         LookingAtPixel = pos;
     }
 
-    private void OnCanvasDropdownSelectionChanged(object? _, SelectionChangedEventArgs e)
+    // HACK: Selection changed fires for no reason
+    private string previousBackup = "place";
+    private void OnCanvasDropdownSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
+        if (viewModel.CurrentBackup is null || viewModel.CurrentBackup == previousBackup)
+        {
+            return;
+        }
+        previousBackup = viewModel.CurrentBackup;
+
         Task.Run(async () =>
         {
-            var backupName = CanvasDropdown.SelectedItem as string ?? viewModel.CurrentPreset.PlacePath;
+            Console.WriteLine("Switching current backup selected");
             
-            if (ViewSelectedBackup.IsChecked is true)
+            if (viewModel.ViewSelectedBackupArea)
             {
-                await ViewCanvasAtBackup(backupName);
+                await ViewCanvasBackupSelection(viewModel.CurrentBackup);
             }
             else
             {
-                await ViewCanvasBackupSelection(backupName);
+                await ViewCanvasAtBackup(viewModel.CurrentBackup);
             }
+            
+            Console.WriteLine("Done");
         });
     }
 
@@ -562,7 +594,7 @@ public partial class MainWindow : Window
         var backupUri = viewModel.CurrentPreset.LegacyServer ?
             UriCombine(viewModel.CurrentPreset.FileServer, backupName, viewModel.CurrentPreset.PlacePath)
             : UriCombine(viewModel.CurrentPreset.FileServer, viewModel.CurrentPreset.BackupsPath, backupName);
-        PreviewImg.Source = await CreateCanvasPreviewImage(backupUri) ?? new Bitmap("../Assets/preview_default.png");
+        //PreviewImg.Source = await CreateCanvasPreviewImage(backupUri) ?? new Bitmap("../Assets/preview_default.png");
         var boardResponse = await Fetch(backupUri);
         if (boardResponse is not null)
         {
@@ -583,7 +615,7 @@ public partial class MainWindow : Window
     private async Task ViewCanvasBackupSelection(string backupName)
     {
         var placePath = UriCombine(viewModel.CurrentPreset.FileServer, viewModel.CurrentPreset.PlacePath);
-        PreviewImg.Source = await CreateCanvasPreviewImage(placePath) ?? new Bitmap("../Assets/preview_default.png");
+        //PreviewImg.Source = await CreateCanvasPreviewImage(placePath) ?? new Bitmap("../Assets/preview_default.png");
 
         var boardResponse = await Fetch(placePath);
         if (boardResponse is not null)
@@ -591,6 +623,7 @@ public partial class MainWindow : Window
             // TODO: Otherwise log that this has gone horrifically wrong
             Board.Board = await boardResponse.Content.ReadAsByteArrayAsync(); 
         }
+        Board.Changes = null;
         
         var backupUri = viewModel.CurrentPreset.LegacyServer ?
             // TODO: Remove hard code for this and make it part of the preset, something like git raw path

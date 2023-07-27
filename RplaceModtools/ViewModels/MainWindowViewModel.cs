@@ -9,6 +9,9 @@ using RplaceModtools.Views;
 namespace RplaceModtools.ViewModels;
 public partial class MainWindowViewModel : ObservableObject
 {
+    [ObservableProperty] private bool viewSelectedBackupArea;
+    [ObservableProperty] private string? currentBackup;
+    
     [ObservableProperty] private bool currentModerationAll = false;
     [ObservableProperty] private ModerationAction currentModerationAction = ModerationAction.None;
     [ObservableProperty] private TimeSpan currentModerationDuration;
