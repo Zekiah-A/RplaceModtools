@@ -21,7 +21,7 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private ServerPresetViewModel currentPreset = new();
     [ObservableProperty] private int currentPaintBrushRadius = 1;
     [ObservableProperty] private Shape currentBrushShape = Shape.Square;
-    [ObservableProperty] private ObservableObject? stateInfo;
+    [ObservableProperty] private ObservableCollection<ObservableObject> stateInfo = new();
     [ObservableProperty] private Tool? currentTool;
 
     [ObservableProperty] private ObservableCollection<string> backups = new();
@@ -122,7 +122,7 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void SelectPaintTool()
     {
-        StateInfo = App.Current.Services.GetRequiredService<PaintBrushStateInfoViewModel>();
+        //StateInfo = App.Current.Services.GetRequiredService<PaintBrushStateInfoViewModel>();
         CurrentTool = Tool.PaintBrush;
     }
 

@@ -103,8 +103,6 @@
 
     <Window.Resources>
         <rplaceModtools:NumericSignConverter x:Key="NumericSignConverter"/>
-        <rplaceModtools:StateInfoIsConverter x:Key="StateInfoIsConverter"/>
-        <rplaceModtools:CurrentToolIsConverter x:Key="CurrentToolIsConverter"/>
         <rplaceModtools:HashColourConverter x:Key="HashColourConverter" />
         <rplaceModtools:ValueEqualsConverter x:Key="ValueEqualsConverter" />
         <rplaceModtools:ValueNotEqualsConverter x:Key="ValueNotEqualsConverter" />
@@ -312,11 +310,17 @@
                 <Border.Background>
                     <SolidColorBrush Color="Gray" Opacity="0.5" />
                 </Border.Background>
-                <TransitioningContentControl Content="{Binding StateInfo}">
-                    <TransitioningContentControl.PageTransition>
-                        <PageSlide Duration="0.1" />
-                    </TransitioningContentControl.PageTransition>
-                </TransitioningContentControl>
+                <ListBox ItemsSource="{Binding StateInfo}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <TransitioningContentControl Content="{Binding }">
+                                <TransitioningContentControl.PageTransition>
+                                    <PageSlide Duration="0.1" />
+                                </TransitioningContentControl.PageTransition>
+                            </TransitioningContentControl>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
             </Border>
             
             <Button ZIndex="3" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="10" Padding="10" Click="OnSelectColourClicked">Select Colour</Button>
@@ -381,7 +385,7 @@
                                               Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" Margin="5 0 0 0">
                                     <ToolTip.Tip>Erase areas of drawings with the paintbrush tool to the the canvas original state.</ToolTip.Tip>Rubber
                                 </ToggleButton>
-                                <ToggleButton IsEnabled="False" x:Name="SelectTool" Command="{Binding SelectSelectionToolCommand}" Checked="ToolToggleButtonCheck"
+                                <ToggleButton x:Name="SelectTool" Command="{Binding SelectSelectionToolCommand}" Checked="ToolToggleButtonCheck"
                                               Grid.Row="1" Grid.Column="0" HorizontalAlignment="Stretch" Margin="0 5 5 0">
                                     <ToolTip.Tip>Select an area of the canvas to view for rollback, or perform modifications on.</ToolTip.Tip>Select tool
                                 </ToggleButton>

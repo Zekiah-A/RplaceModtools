@@ -160,9 +160,14 @@ public partial class SkCanvas : UserControl
             }
             if (changesCache is null && changes is not null)
             {
-                using var img = new SKBitmap((int)ParentSk.CanvasWidth, (int)ParentSk.CanvasHeight, true);
+                using var img = new SKBitmap((int)ParentSk.CanvasWidth, (int)ParentSk.CanvasHeight);
                 for (var i = 0; i < changes.Length; i++)
                 {
+                    if (changes[i] == 0)
+                    {
+                        continue;
+                    }
+                    
                     img.SetPixel((int)(i % ParentSk.CanvasWidth), (int)(i / ParentSk.CanvasWidth), PaletteViewModel.Colours[changes[i]]);
                 }
                 
@@ -231,7 +236,24 @@ public partial class SkCanvas : UserControl
             {
                 var sKBrush = new SKPaint();
                 sKBrush.Color = new SKColor(100, 167, 255, 140);
-                canvas.DrawRect((float) Math.Floor(sel.TopLeft.X), (float) Math.Floor(sel.TopLeft.Y), (float) Math.Floor(sel.BottomRight.X), (float) Math.Floor(sel.BottomRight.Y), sKBrush);
+                var selX = (float) Math.Floor(sel.TopLeft.X);
+                var selY = (float) Math.Floor(sel.TopLeft.Y);
+                var selWidth = (float) Math.Floor(sel.BottomRight.X - selX);
+                var selHeight = (float) Math.Floor(sel.BottomRight.Y - selY);
+                canvas.DrawRect(selX, selY, selWidth, selHeight, sKBrush);
+
+                using var selInfoPaint = new SKPaint();
+                selInfoPaint.TextSize = 18;
+                selInfoPaint.Color = SKColors.White;
+                selInfoPaint.IsAntialias = true;
+                using var selInfoOutlinePaint = new SKPaint();
+                selInfoOutlinePaint.TextSize = 18;
+                selInfoOutlinePaint.Color = SKColors.Black;
+                selInfoOutlinePaint.IsAntialias = true;
+                selInfoOutlinePaint.Style = SKPaintStyle.Stroke;
+                selInfoOutlinePaint.StrokeWidth = 2;
+                canvas.DrawText($"({selX}, {selY}) {selWidth}x{selHeight}px", selX, selY, selInfoOutlinePaint);
+                canvas.DrawText($"({selX}, {selY}) {selWidth}x{selHeight}px", selX, selY, selInfoPaint);
             }
             
             canvas.Flush();

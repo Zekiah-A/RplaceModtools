@@ -25,6 +25,9 @@ using Timer = System.Timers.Timer;
 namespace RplaceModtools.Views;
 public partial class MainWindow : Window
 {
+    private byte[]? mainChanges;
+    private byte[]? mainBoard;
+
     private bool mouseDown;
     private Point mouseLast;
     private Point mouseTravel;
@@ -34,9 +37,9 @@ public partial class MainWindow : Window
     private readonly Cursor cross = new(StandardCursorType.Cross);
     private WebsocketClient? socket;
     private TaskCompletionSource<byte[]> boardFetchSource = new();
-        
     private MainWindowViewModel viewModel;
-    //TODO: Switch these to using dependency injection
+    
+    // TODO: Switch these to using dependency injection
     private PaletteViewModel PVM => (PaletteViewModel) PaletteListBox.DataContext!;
     private LiveChatViewModel LCVM => (LiveChatViewModel) LiveChatGridContainer.DataContext!;
     
@@ -95,32 +98,35 @@ public partial class MainWindow : Window
     }
     
     //Decompress changes so it can be put onto canv
-    private byte[] RunLengthChanges(byte[] data)
+    private byte[] RunLengthChanges(Span<byte> data)
     {
+        // TODO: Fix possible misalignment causing messed up changes
+        var i = 0;
         var changeI = 0;
         var changes = new byte[(int) (Board.CanvasWidth * Board.CanvasHeight)];
 
-        for (var i = 9; i < data.Length;)
+        while (i < data.Length)
         {
             var cell = data[i++];
-            var c = cell >> 6;
-            switch (c)
+            var repeats = cell >> 6;
+            switch (repeats)
             {
                 case 1:
-                    c = data[i++];
+                    repeats = data[i++];
                     break;
                 case 2:
-                    c = BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan()[i++..]);
+                    repeats = BinaryPrimitives.ReadUInt16BigEndian(data[i++..]);
                     i++;
                     break;
                 case 3:
-                    c = (int) BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan()[i++..]);
+                    repeats = (int) BinaryPrimitives.ReadUInt32BigEndian(data[i++..]);
                     i += 3;
                     break;
             }
-            changeI += c;
+            changeI += repeats;
             changes[changeI] = (byte) (cell & 63);
         }
+        
         return changes;
     }
 
@@ -154,7 +160,8 @@ public partial class MainWindow : Window
                     var cooldown = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan()[5..]);
                     if (cooldown == 0xFFFFFFFF)
                     {
-                        Console.WriteLine("Canvas is locked (readonly). Edits can not be made");
+                        Console.WriteLine("Canvas is locked (readonly). Edits can not be made.");
+                        viewModel.StateInfo.Add(App.Current.Services.GetRequiredService<LiveCanvasStateInfoViewModel>());
                     }
 
                     // New server packs canvas width and height in code 1, making it 17, equivalent to packet 2
@@ -165,7 +172,7 @@ public partial class MainWindow : Window
                         
                         Task.Run(async () =>
                         {
-                            Board.Board = BoardPacker.RunLengthDecompressBoard(
+                            Board.Board = mainBoard = BoardPacker.RunLengthDecompressBoard(
                                 await boardFetchSource.Task, (int)(Board.CanvasWidth * Board.CanvasHeight));
                         });
                     }
@@ -178,10 +185,9 @@ public partial class MainWindow : Window
                     Board.CanvasHeight = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan()[5..]);
                     Task.Run(async () =>
                     {
-                        Board.Board = await boardFetchSource.Task;
+                        Board.Board = mainBoard = await boardFetchSource.Task;
+                        Board.Changes = mainChanges = RunLengthChanges(msg.Binary.AsSpan()[9..]);
                     });
-                    
-                    Board.Changes = RunLengthChanges(msg.Binary);
                     break;
                 }
                 case 6: //Incoming pixel someone else sent
@@ -294,22 +300,12 @@ public partial class MainWindow : Window
             using var backupsRepository = new Repository(localPath);
             var signature = new Signature("RplaceModtools", "rplacemodtools@unknown.com", DateTimeOffset.Now);
             var mergeResult = Commands.Pull(backupsRepository, signature, new PullOptions());
-            /*
-            var refSpec = string.Format("refs/heads/{2}:refs/remotes/{0}/{1}", "origin", "main", "main");
-             * new[] { refSpec }, new FetchOptions
-            {
-                TagFetchMode = TagFetchMode.None,
-            }, null
-             */
+
             if (mergeResult.Status == MergeStatus.Conflicts)
             {
                 Console.WriteLine($"Merge failed - serious file conflict. Try deleting local backups repository? ${localPath}");
             }
-            /*else
-            {
-                backupsRepository.Commit("Merge changes from remote", signature, signature);
-            }*/
-            
+
             var placePath = viewModel.CurrentPreset.PlacePath.StartsWith("/") 
                 ? viewModel.CurrentPreset.PlacePath[1..]
                 : viewModel.CurrentPreset.PlacePath;
@@ -411,18 +407,15 @@ public partial class MainWindow : Window
         _ = CreateConnection(UriCombine(viewModel.CurrentPreset.Websocket, viewModel.CurrentPreset.AdminKey));
         _ = Task.Run(async () =>
         {
-            var boardPath = UriCombine(viewModel.CurrentPreset.FileServer,
-                viewModel.CurrentPreset.PlacePath);
+            var boardPath = UriCombine(viewModel.CurrentPreset.FileServer, viewModel.CurrentPreset.PlacePath);
             var boardResponse = await Fetch(boardPath);
             if (boardResponse is null)
             {
-                // TODO: Log that something has gone fatally wrong to console, close connection and perhaps
-                // TODO: allow them to to connect/start again
                 throw new Exception("Initial board load failed. Board response was null");
             }
             
             boardFetchSource.SetResult(await boardResponse.Content.ReadAsByteArrayAsync());
-            PreviewImg.Source = await CreateCanvasPreviewImage(boardResponse);
+            //PreviewImg.Source = await CreateCanvasPreviewImage(boardResponse);
         });
         PlaceConfigPanel.IsVisible = false;
         DownloadBtn.IsEnabled = true;
@@ -440,7 +433,8 @@ public partial class MainWindow : Window
         
         if (viewModel.CurrentTool == Tool.Select)
         {
-            Board.StartSelection(MouseOverPixel(e), MouseOverPixel(e));
+            var mousePos = MouseOverPixel(e);
+            Board.StartSelection(mousePos, mousePos);
         }
     }
 
@@ -559,7 +553,8 @@ public partial class MainWindow : Window
     }
 
     // HACK: Selection changed fires for no reason
-    private string previousBackup = "place";
+    private string previousBackup = "";
+    
     private void OnCanvasDropdownSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (viewModel.CurrentBackup is null || viewModel.CurrentBackup == previousBackup)
@@ -567,12 +562,14 @@ public partial class MainWindow : Window
             return;
         }
         previousBackup = viewModel.CurrentBackup;
-
+        
         Task.Run(async () =>
         {
-            Console.WriteLine("Switching current backup selected");
-            
-            if (viewModel.ViewSelectedBackupArea)
+            if (viewModel.CurrentBackup == "place")
+            {
+                await ViewMainCanvas();
+            }
+            else if (viewModel.ViewSelectedBackupArea)
             {
                 await ViewCanvasBackupSelection(viewModel.CurrentBackup);
             }
@@ -580,9 +577,24 @@ public partial class MainWindow : Window
             {
                 await ViewCanvasAtBackup(viewModel.CurrentBackup);
             }
-            
-            Console.WriteLine("Done");
         });
+    }
+    
+    /// <summary>
+    /// Will set the board to a cache version of the current main canvas
+    /// </summary>
+    /// <exception cref="Exception">Occurs if main board is null
+    /// Will only be the case if this method is attempted to be called before initial board load.</exception>
+    private async Task ViewMainCanvas()
+    {
+        if (mainBoard is null)
+        {
+            throw new Exception("Can not view main canvas. Main board from initial fetch was null.");
+        }
+
+        Board.Board = mainBoard;
+        Board.Changes = mainChanges;
+        //PreviewImg.Source = await CreateCanvasPreviewImage(mainBoard) ?? new Bitmap("../Assets/preview_default.png");
     }
 
     /// <summary>
@@ -594,7 +606,7 @@ public partial class MainWindow : Window
         var backupUri = viewModel.CurrentPreset.LegacyServer ?
             UriCombine(viewModel.CurrentPreset.FileServer, backupName, viewModel.CurrentPreset.PlacePath)
             : UriCombine(viewModel.CurrentPreset.FileServer, viewModel.CurrentPreset.BackupsPath, backupName);
-        //PreviewImg.Source = await CreateCanvasPreviewImage(backupUri) ?? new Bitmap("../Assets/preview_default.png");
+        
         var boardResponse = await Fetch(backupUri);
         if (boardResponse is not null)
         {
@@ -604,7 +616,9 @@ public partial class MainWindow : Window
         
         Board.Changes = null;
         Board.ClearSelections();
-        viewModel.StateInfo = CanvasDropdown.SelectedIndex != 0 ? App.Current.Services.GetRequiredService<LiveCanvasStateInfoViewModel>() : null;
+        
+        viewModel.StateInfo.Add(App.Current.Services.GetRequiredService<LockedCanvasStateInfoViewModel>());
+        //PreviewImg.Source = await CreateCanvasPreviewImage(backupUri) ?? new Bitmap("../Assets/preview_default.png");
     }
 
     /// <summary>
@@ -614,29 +628,20 @@ public partial class MainWindow : Window
     /// </summary>
     private async Task ViewCanvasBackupSelection(string backupName)
     {
-        var placePath = UriCombine(viewModel.CurrentPreset.FileServer, viewModel.CurrentPreset.PlacePath);
-        //PreviewImg.Source = await CreateCanvasPreviewImage(placePath) ?? new Bitmap("../Assets/preview_default.png");
-
-        var boardResponse = await Fetch(placePath);
-        if (boardResponse is not null)
-        {
-            // TODO: Otherwise log that this has gone horrifically wrong
-            Board.Board = await boardResponse.Content.ReadAsByteArrayAsync(); 
-        }
-        Board.Changes = null;
+        await ViewMainCanvas();
         
         var backupUri = viewModel.CurrentPreset.LegacyServer ?
             // TODO: Remove hard code for this and make it part of the preset, something like git raw path
             UriCombine(viewModel.CurrentPreset.FileServer, backupName, viewModel.CurrentPreset.PlacePath)
             : UriCombine(viewModel.CurrentPreset.FileServer, viewModel.CurrentPreset.BackupsPath, backupName);
+        
         Board.ClearSelections();
         var backupResponse = await Fetch(backupUri);
-        if (boardResponse is not null)
+        var backupTask = backupResponse?.Content.ReadAsByteArrayAsync();
+        if (backupTask is not null)
         {
-            // TODO: Otherwise log that this has gone horrifically wrong
-            Board.SelectionBoard = await backupResponse!.Content.ReadAsByteArrayAsync();
+            Board.SelectionBoard = await backupTask;
         }
-        viewModel.StateInfo = null;
     }
 
     private void OnViewSelectedBackupChecked(object? sender, RoutedEventArgs e)
