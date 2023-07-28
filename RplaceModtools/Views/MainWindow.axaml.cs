@@ -239,7 +239,7 @@ public partial class MainWindow : Window
                     }
                     else
                     {
-                        Console.WriteLine($"Could not handle message: [{msgData[1]}/{msgData[2]}{(uid == null ? "" : "/" + uid)}] {msgData[0]}");
+                        //Console.WriteLine($"Could not handle message: [{msgData[1]}/{msgData[2]}{(uid == null ? "" : "/" + uid)}] {msgData[0]}");
                     }
                     break;
                 }
@@ -427,14 +427,79 @@ public partial class MainWindow : Window
     
     private void OnBackgroundMouseDown(object? sender, PointerPressedEventArgs e)
     {
-        if (e.Source is null || !e.Source.Equals(CanvasBackground)) return; //stop bubbling
+        if (e.Source is null || !e.Source.Equals(CanvasBackground))
+        {
+            return; //stop bubbling
+        }
+
         mouseTravel = new Point(0, 0);
         mouseDown = true;
-        
-        if (viewModel.CurrentTool == Tool.Select)
+
+        if (viewModel.CurrentTool != Tool.Select)
         {
-            var mousePos = MouseOverPixel(e);
-            Board.StartSelection(mousePos, mousePos);
+            return;
+        }
+        
+        var mousePosition = MouseOverPixel(e);
+        foreach (var selection in Board.Selections)
+        {
+            if (selection.TopLeft.X < mousePosition.X && selection.TopLeft.Y < mousePosition.Y &&
+                selection.BottomRight.X > mousePosition.X && selection.BottomRight.Y > mousePosition.Y)
+            {
+                if (e.GetCurrentPoint(null).Properties.IsRightButtonPressed)
+                {
+                    Board.RemoveSelection(selection);
+                }
+                else
+                {
+                    Board.CurrentSelection = selection;
+                }
+                    
+                return;
+            }
+        }
+
+        if (e.GetCurrentPoint(null).Properties.IsLeftButtonPressed)
+        {
+            // Try find if we are near any of the current selection's handles,
+            // if so we current that handle, otherwise, we will create a new selection
+            if (Board.CurrentSelection is not null
+                && Board.CurrentSelection.TopLeft.X - 8 < mousePosition.X && Board.CurrentSelection.TopLeft.Y - 8 < mousePosition.Y
+                && Board.CurrentSelection.BottomRight.X + 8 > mousePosition.X && Board.CurrentSelection.BottomRight.Y + 8 > mousePosition.Y)
+            {
+                if (Math.Abs(Board.CurrentSelection.TopLeft.X - mousePosition.X) < 4)
+                {
+                    if (Math.Abs(Board.CurrentSelection.TopLeft.Y - mousePosition.Y) < 4) // Tl handle
+                    {
+                        Board.CurrentHandle = SelectionHandle.TopLeft;
+                    }
+                    else if (Math.Abs(Board.CurrentSelection.BottomRight.Y - mousePosition.Y) < 4) // Bl handle
+                    {
+                        Board.CurrentHandle = SelectionHandle.BottomLeft;
+                    }
+                }
+                else if (Math.Abs(Board.CurrentSelection.BottomRight.X - mousePosition.X) < 4)
+                {
+                    if (Math.Abs(Board.CurrentSelection.BottomRight.Y - mousePosition.Y) < 4) // Br handle
+                    {
+                        Board.CurrentHandle = SelectionHandle.BottomRight;
+                    }
+                    else if (Math.Abs(Board.CurrentSelection.TopLeft.Y - mousePosition.Y) < 4) // Tr handle
+                    {
+                        Board.CurrentHandle = SelectionHandle.TopRight;
+                    }
+                }
+                else
+                {
+                    Board.CurrentHandle = SelectionHandle.None;
+                }
+            }
+            else
+            {
+                var newSelection = Board.StartSelection(mousePosition, new Point(mousePosition.X + 4, mousePosition.Y + 4));
+                Board.CurrentSelection = newSelection;
+                Board.CurrentHandle = SelectionHandle.BottomRight;
+            }
         }
     }
 
@@ -478,7 +543,6 @@ public partial class MainWindow : Window
                 Cursor = cross;
                 
                 //If mouse if over board, then get pixel colour at that position.
-                //var pixelColour =  
                 var colourIndex = BoardColourAt((uint)Math.Floor(e.GetPosition(CanvasBackground).X),
                     (uint)Math.Floor(e.GetPosition(CanvasBackground).Y));
                 if (colourIndex == -1)
@@ -492,9 +556,36 @@ public partial class MainWindow : Window
                     new Color(pixelColour.Alpha, pixelColour.Red, pixelColour.Green, pixelColour.Blue));
                 return;
             }
-            if (viewModel.CurrentTool == Tool.Select)
+            if (viewModel.CurrentTool == Tool.Select && Board.CurrentSelection is not null)
             {
-                Board.UpdateSelection(null, MouseOverPixel(e));
+                var mousePosition = MouseOverPixel(e);
+                if (Board.CurrentHandle == SelectionHandle.None)
+                {
+                    return;
+                }
+
+                var topleft = Board.CurrentHandle switch
+                {
+                    SelectionHandle.TopLeft => new Point(Math.Min(mousePosition.X, Board.CurrentSelection.BottomRight.X - 4),
+                            Math.Min(mousePosition.Y, Board.CurrentSelection.BottomRight.Y - 4)),
+                    SelectionHandle.BottomLeft => new Point(Math.Min(mousePosition.X, Board.CurrentSelection.BottomRight.X - 4),
+                            Board.CurrentSelection.TopLeft.Y),
+                    SelectionHandle.TopRight => new Point(Board.CurrentSelection.TopLeft.X,
+                            Math.Min(mousePosition.Y, Board.CurrentSelection.BottomRight.Y - 4)),
+                    _ => Board.CurrentSelection.TopLeft
+                };
+                var bottomRight = Board.CurrentHandle switch
+                {
+                    SelectionHandle.BottomLeft => new Point(Board.CurrentSelection.BottomRight.X,
+                            Math.Max(mousePosition.Y, Board.CurrentSelection.TopLeft.Y + 4)),
+                    SelectionHandle.BottomRight => new Point(Math.Max(mousePosition.X, Board.CurrentSelection.TopLeft.X + 4),
+                            Math.Max(mousePosition.Y, Board.CurrentSelection.TopLeft.Y + 4)),
+                    SelectionHandle.TopRight => new Point(Math.Max(mousePosition.X, Board.CurrentSelection.TopLeft.X + 4),
+                            Board.CurrentSelection.BottomRight.Y),
+                    _ => Board.CurrentSelection.BottomRight
+                };
+
+                Board.UpdateSelection(Board.CurrentSelection, topleft, bottomRight);
                 return;
             }
             if (PVM.CurrentColour is not null) //drag place pixels
@@ -531,6 +622,11 @@ public partial class MainWindow : Window
             return;
         }
         mouseDown = false;
+
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            Board.CurrentHandle = SelectionHandle.None;
+        }
         
         //click place pixel
         if (PVM.CurrentColour is null) return;
@@ -635,7 +731,6 @@ public partial class MainWindow : Window
             UriCombine(viewModel.CurrentPreset.FileServer, backupName, viewModel.CurrentPreset.PlacePath)
             : UriCombine(viewModel.CurrentPreset.FileServer, viewModel.CurrentPreset.BackupsPath, backupName);
         
-        Board.ClearSelections();
         var backupResponse = await Fetch(backupUri);
         var backupTask = backupResponse?.Content.ReadAsByteArrayAsync();
         if (backupTask is not null)
@@ -809,7 +904,7 @@ public partial class MainWindow : Window
             return;
         }
         
-        var sel = Board.Selections.Peek();
+        var sel = Board.Selections.Last();
         RollbackArea((int) sel.TopLeft.X, (int) sel.TopLeft.Y, (int) sel.BottomRight.X - (int) sel.TopLeft.X, 
             (int) sel.BottomRight.Y - (int) sel.TopLeft.Y, Board.SelectionBoard);
     }
@@ -829,29 +924,7 @@ public partial class MainWindow : Window
 
         timer.Start();
     }
-
-    private void ToolToggleButtonCheck(object? sender, RoutedEventArgs e)
-    {
-        ArgumentNullException.ThrowIfNull(sender);
-        var toggleButton = (ToggleButton) sender;
-        
-        switch (toggleButton.Name)
-        {
-            case "PaintTool":
-                RubberTool.IsChecked = false;
-                SelectTool.IsChecked = false;
-                break;
-            case "RubberTool":
-                PaintTool.IsChecked = false;
-                SelectTool.IsChecked = false;
-                break;
-            case "SelectTool":
-                RubberTool.IsChecked = false;
-                PaintTool.IsChecked = false;
-                break;
-        }
-    }
-
+    
     private void OnPresetsAdvancedClicked(object? sender, RoutedEventArgs e)
     {
         PresetsAdvancedPanel.IsVisible = !PresetsAdvancedPanel.IsVisible;
@@ -1047,7 +1120,7 @@ public partial class MainWindow : Window
         viewModel.CurrentModerationAction = ModerationAction.None;
         viewModel.CurrentModerationUid = "";
     }
-
+    
     private void OnLoadLocalClicked(object? sender, RoutedEventArgs e)
     {
         throw new NotImplementedException();
@@ -1055,4 +1128,5 @@ public partial class MainWindow : Window
 
     [GeneratedRegex(@"github.com\/[\w\-]+\/([\w\-]+)")]
     private static partial Regex RepositoryNameRegex();
+
 }

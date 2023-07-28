@@ -1,10 +1,7 @@
 ﻿using System.Collections.ObjectModel;
-using Avalonia.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Extensions.DependencyInjection;
 using RplaceModtools.Models;
-using RplaceModtools.Views;
 
 namespace RplaceModtools.ViewModels;
 public partial class MainWindowViewModel : ObservableObject
@@ -22,7 +19,7 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private int currentPaintBrushRadius = 1;
     [ObservableProperty] private Shape currentBrushShape = Shape.Square;
     [ObservableProperty] private ObservableCollection<ObservableObject> stateInfo = new();
-    [ObservableProperty] private Tool? currentTool;
+    [ObservableProperty] private Tool currentTool = Tool.None;
 
     [ObservableProperty] private ObservableCollection<string> backups = new();
     public string[] KnownWebsockets => new[]
@@ -129,14 +126,14 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void SelectRubberTool()
     {
-        StateInfo = null;
+        //StateInfo.Remove();
         CurrentTool = Tool.Rubber;
     }
 
     [RelayCommand]
     private void SelectSelectionTool()
     {
-        StateInfo = null;
+        //StateInfo.Remove();
         CurrentTool = Tool.Select;
     }
 }

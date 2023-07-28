@@ -1,4 +1,3 @@
-using System;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
@@ -9,7 +8,7 @@ using RplaceModtools.ViewModels;
 
 namespace RplaceModtools
 {
-    public partial class App : Application
+    public class App : Application
     {
         public new static App Current => (App) Application.Current!;
         public IServiceProvider Services { get; }
@@ -19,8 +18,10 @@ namespace RplaceModtools
             Services = new ServiceCollection()
                 .AddSingleton<MainWindow>()
                 .AddSingleton<MainWindowViewModel>()
-                .AddTransient<LiveCanvasStateInfoViewModel>()
-                .AddTransient<PaintBrushStateInfoViewModel>()
+                .AddSingleton<LiveCanvasStateInfoViewModel>()
+                .AddSingleton<PaintBrushStateInfoViewModel>()
+                .AddSingleton<SelectStateInfoViewModel>()
+                .AddTransient<LockedCanvasStateInfo>()
                 .BuildServiceProvider();
         }
 

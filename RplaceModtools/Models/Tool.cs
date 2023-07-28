@@ -4,5 +4,7 @@ public enum Tool
 {
     PaintBrush,
     Rubber,
-    Select
+    Select,
+    Macro,
+    None
 }

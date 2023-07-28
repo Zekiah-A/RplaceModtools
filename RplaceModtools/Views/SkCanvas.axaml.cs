@@ -16,19 +16,21 @@ public partial class SkCanvas : UserControl
 {
     public uint CanvasWidth = 500;
     public uint CanvasHeight = 500;
-    public Stack<Selection> Selections = new();
+    public List<Selection> Selections = new(); // TODO: ReadonlyList
+    public SelectionHandle CurrentHandle = SelectionHandle.None;
     
-    private static byte[]? board;
-    private static byte[]? changes;
-    private static SKImage? boardCache;
-    private static SKImage? changesCache;
-    private static byte[]? socketPixels;
+    protected Selection? currentSelection;
+    protected byte[]? board;
+    protected byte[]? changes;
+    protected SKImage? boardCache;
+    protected SKImage? changesCache;
+    protected byte[]? socketPixels;
 
-    private static byte[]? selectionBoard;
-    private static SKImage? selectionCanvasCache;
-    private static float canvZoom = 1;
-    private static SKPoint canvPosition = SKPoint.Empty;
-    private static List<SKPaint> paints = new();
+    protected byte[]? selectionBoard;
+    protected SKImage? selectionCanvasCache;
+    protected float canvZoom = 1;
+    protected SKPoint canvPosition = SKPoint.Empty;
+    protected List<SKPaint> paints = new();
 
     public byte[]? SocketPixels
     {
@@ -103,6 +105,17 @@ public partial class SkCanvas : UserControl
         }
     }
 
+    public Selection? CurrentSelection
+    {
+        get => currentSelection;
+        set
+        {
+            currentSelection = value;
+            Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
+        }
+    }
+
+
     public SkCanvas()
     {
         InitializeComponent();
@@ -144,43 +157,43 @@ public partial class SkCanvas : UserControl
             canvas.Save();
             
             //These must happen first because apparently it just works that way, idk.
-            canvas.Scale(canvZoom,canvZoom);
-            canvas.Translate(canvPosition.X, canvPosition.Y);
+            canvas.Scale(ParentSk.canvZoom, ParentSk.canvZoom);
+            canvas.Translate(ParentSk.canvPosition.X, ParentSk.canvPosition.Y);
 
             //Equivalent of renderAll
-            if (boardCache is null && board is not null)
+            if (ParentSk.boardCache is null && ParentSk.board is not null)
             {
                 using var img = new SKBitmap((int)ParentSk.CanvasWidth, (int)ParentSk.CanvasHeight, true);
-                for (var i = 0; i < board.Length; i++)
+                for (var i = 0; i < ParentSk.board.Length; i++)
                 {
-                    img.SetPixel((int)(i % ParentSk.CanvasWidth), (int)(i / ParentSk.CanvasWidth), PaletteViewModel.Colours[board[i]]);
+                    img.SetPixel((int)(i % ParentSk.CanvasWidth), (int)(i / ParentSk.CanvasWidth), PaletteViewModel.Colours[ParentSk.board[i]]);
                 }
 
-                boardCache = SKImage.FromBitmap(img);
+                ParentSk.boardCache = SKImage.FromBitmap(img);
             }
-            if (changesCache is null && changes is not null)
+            if (ParentSk.changesCache is null && ParentSk.changes is not null)
             {
                 using var img = new SKBitmap((int)ParentSk.CanvasWidth, (int)ParentSk.CanvasHeight);
-                for (var i = 0; i < changes.Length; i++)
+                for (var i = 0; i < ParentSk.changes.Length; i++)
                 {
-                    if (changes[i] == 0)
+                    if (ParentSk.changes[i] == 0)
                     {
                         continue;
                     }
                     
-                    img.SetPixel((int)(i % ParentSk.CanvasWidth), (int)(i / ParentSk.CanvasWidth), PaletteViewModel.Colours[changes[i]]);
+                    img.SetPixel((int)(i % ParentSk.CanvasWidth), (int)(i / ParentSk.CanvasWidth), PaletteViewModel.Colours[ParentSk.changes[i]]);
                 }
                 
-                changesCache = SKImage.FromBitmap(img);
+                ParentSk.changesCache = SKImage.FromBitmap(img);
             }
 
-            if (boardCache is not null)
+            if (ParentSk.boardCache is not null)
             {
-                canvas.DrawImage(boardCache, 0, 0);
+                canvas.DrawImage(ParentSk.boardCache, 0, 0);
                 
-                if (changesCache is not null)
+                if (ParentSk.changesCache is not null)
                 {
-                    canvas.DrawImage(changesCache, 0, 0);
+                    canvas.DrawImage(ParentSk.changesCache, 0, 0);
                 }
             }
             else
@@ -198,19 +211,19 @@ public partial class SkCanvas : UserControl
             }
             
             //Draw all pixels that have come in to the canvas.
-            if (socketPixels is not null)
+            if (ParentSk.socketPixels is not null)
             {
-                for (var c = 0; c < socketPixels.Length; c++)
+                for (var c = 0; c < ParentSk.socketPixels.Length; c++)
                 {
-                    if (socketPixels[c] == 255) continue;
-                    canvas.DrawRect(c % ParentSk.CanvasWidth, c / ParentSk.CanvasWidth, 1, 1, paints[socketPixels[c]]);
+                    if (ParentSk.socketPixels[c] == 255) continue;
+                    canvas.DrawRect(c % ParentSk.CanvasWidth, c / ParentSk.CanvasWidth, 1, 1, ParentSk.paints[ParentSk.socketPixels[c]]);
                 }
             }
             
-            if (selectionBoard is not null && selectionCanvasCache is null)
+            if (ParentSk.selectionBoard is not null && ParentSk.selectionCanvasCache is null)
             {
                 using var img = new SKBitmap((int)ParentSk.CanvasWidth, (int)ParentSk.CanvasHeight);
-                for (var i = 0; i < selectionBoard.Length; i++)
+                for (var i = 0; i < ParentSk.selectionBoard.Length; i++)
                 {
                     //TODO: This method is not fully efficient and only attempting to draw at all within the selection bounds would be better.
                     foreach (var sel in ParentSk.Selections
@@ -219,16 +232,17 @@ public partial class SkCanvas : UserControl
                             && i / ParentSk.CanvasHeight >= sel.TopLeft.Y
                             && i / ParentSk.CanvasHeight <= sel.BottomRight.Y))
                     {
-                        img.SetPixel((int)(i % ParentSk.CanvasWidth), (int)(i / ParentSk.CanvasWidth), PaletteViewModel.Colours[selectionBoard[i]]);
+                        img.SetPixel((int)(i % ParentSk.CanvasWidth), (int)(i / ParentSk.CanvasWidth), PaletteViewModel.Colours[ParentSk.selectionBoard[i]]);
                     }
                 }
-                selectionCanvasCache = SKImage.FromBitmap(img);
-                selectionBoard = null;
+
+                ParentSk.selectionCanvasCache = SKImage.FromBitmap(img);
+                ParentSk.selectionBoard = null;
                 img.Dispose();
             }
-            if (selectionCanvasCache is not null)
+            if (ParentSk.selectionCanvasCache is not null)
             {
-                canvas.DrawImage(selectionCanvasCache, 0, 0);
+                canvas.DrawImage(ParentSk.selectionCanvasCache, 0, 0);
             }
             
             //Draw selections
@@ -254,6 +268,19 @@ public partial class SkCanvas : UserControl
                 selInfoOutlinePaint.StrokeWidth = 2;
                 canvas.DrawText($"({selX}, {selY}) {selWidth}x{selHeight}px", selX, selY, selInfoOutlinePaint);
                 canvas.DrawText($"({selX}, {selY}) {selWidth}x{selHeight}px", selX, selY, selInfoPaint);
+
+                if (sel == ParentSk.currentSelection)
+                {
+                    using var selHandlePoint = new SKPaint
+                    {
+                        Color = SKColors.Blue
+                    };
+                    
+                    canvas.DrawCircle(new SKPoint((float) sel.TopLeft.X, (float) sel.TopLeft.Y), 4, selHandlePoint);
+                    canvas.DrawCircle(new SKPoint((float) sel.TopLeft.X, (float) sel.BottomRight.Y), 4, selHandlePoint);
+                    canvas.DrawCircle(new SKPoint((float) sel.BottomRight.X, (float) sel.TopLeft.Y), 4, selHandlePoint);
+                    canvas.DrawCircle(new SKPoint((float) sel.BottomRight.X, (float) sel.BottomRight.Y), 4, selHandlePoint);
+                }
             }
             
             canvas.Flush();
@@ -267,30 +294,36 @@ public partial class SkCanvas : UserControl
         context.Custom(new CustomDrawOp(new Rect(0, 0, Bounds.Width, Bounds.Height), this));
     }
     
-    public void StartSelection(Point topLeft, Point bottomRight)
+    public Selection StartSelection(Point topLeft, Point bottomRight)
     {
         var sel = new Selection
         {
             TopLeft = topLeft,
             BottomRight = bottomRight
         };
-        Selections.Push(sel);
+        
+        Selections.Add(sel);
+        Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
+        return sel;
+    }
+
+    public void UpdateSelection(Selection selection, Point? topLeft = null, Point? bottomRight = null)
+    {
+        selection.TopLeft = topLeft ?? selection.TopLeft;
+        selection.BottomRight = bottomRight ?? selection.BottomRight;
+        selectionCanvasCache = null;
         Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
     }
 
-    public void UpdateSelection(Point? topLeft = null, Point? bottomRight = null)
+    public void RemoveSelection(Selection selection)
     {
-        var cur = Selections.Pop();
-        cur.TopLeft = topLeft ?? cur.TopLeft;
-        cur.BottomRight = bottomRight ?? cur.BottomRight;
-        Selections.Push(cur);
-        selectionCanvasCache = null;
+        Selections.Remove(selection);
         Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
     }
 
     public void ClearSelections()
     {
-        Selections = new Stack<Selection>();
+        Selections.Clear();
         selectionCanvasCache = null;
         Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
     }
@@ -319,7 +352,7 @@ public partial class SkCanvas : UserControl
     }
 }
 
-public struct Selection
+public class Selection
 {
     public Point TopLeft;
     public Point BottomRight;

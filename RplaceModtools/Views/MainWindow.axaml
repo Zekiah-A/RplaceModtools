@@ -377,19 +377,31 @@
                             </Panel>
                             <TextBlock FontSize="18">Tool modes:</TextBlock>
                             <Grid Margin="5" RowDefinitions="*, *" ColumnDefinitions="*, *">
-                                <ToggleButton x:Name="PaintTool" Command="{Binding SelectPaintToolCommand}" Checked="ToolToggleButtonCheck"
+                                <ToggleButton x:Name="PaintTool" Command="{Binding SelectPaintToolCommand}" 
+                                              IsChecked="{Binding CurrentTool,
+                                                  Converter={StaticResource ValueEqualsConverter},
+                                                  ConverterParameter={x:Static models:Tool.PaintBrush}}"
                                               Grid.Row="0" Grid.Column="0" HorizontalAlignment="Stretch" Margin="0 0 5 0">
                                     <ToolTip.Tip>Easily and quickly perform drawing operations upon the canvas.</ToolTip.Tip>Paintbrush
                                 </ToggleButton>
-                                <ToggleButton IsEnabled="False" x:Name="RubberTool" Command="{Binding SelectRubberToolCommand}" Checked="ToolToggleButtonCheck"
+                                <ToggleButton IsEnabled="False" x:Name="RubberTool" Command="{Binding SelectRubberToolCommand}"
+                                              IsChecked="{Binding CurrentTool,
+                                                  Converter={StaticResource ValueEqualsConverter},
+                                                  ConverterParameter={x:Static models:Tool.Rubber}}"
                                               Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" Margin="5 0 0 0">
                                     <ToolTip.Tip>Erase areas of drawings with the paintbrush tool to the the canvas original state.</ToolTip.Tip>Rubber
                                 </ToggleButton>
-                                <ToggleButton x:Name="SelectTool" Command="{Binding SelectSelectionToolCommand}" Checked="ToolToggleButtonCheck"
+                                <ToggleButton x:Name="SelectTool" Command="{Binding SelectSelectionToolCommand}"
+                                              IsChecked="{Binding CurrentTool,
+                                                  Converter={StaticResource ValueEqualsConverter},
+                                                  ConverterParameter={x:Static models:Tool.Select}}"
                                               Grid.Row="1" Grid.Column="0" HorizontalAlignment="Stretch" Margin="0 5 5 0">
                                     <ToolTip.Tip>Select an area of the canvas to view for rollback, or perform modifications on.</ToolTip.Tip>Select tool
                                 </ToggleButton>
                                 <ToggleButton x:Name="MacroTool" IsEnabled="False" Grid.Row="1" Grid.Column="1"
+                                              IsChecked="{Binding CurrentTool,
+                                                  Converter={StaticResource ValueEqualsConverter},
+                                                  ConverterParameter={x:Static models:Tool.Macro}}"
                                               HorizontalAlignment="Stretch" Margin="5 5 0 0">
                                     <ToolTip.Tip>Automate canvas moderation actions with small scripts.</ToolTip.Tip>Macro Execution
                                 </ToggleButton>
@@ -418,7 +430,12 @@
                             <TabControl.DataTemplates> <!-- Contents -->
                                 <DataTemplate DataType="{x:Type vm:LiveChatChannelViewModel}">
                                     <ListBox ItemsSource="{Binding Messages}"
-                                             Background="Transparent"> <!--VirtualizationMode="Simple" TODO: Virtualize -->
+                                             Background="Transparent">
+                                        <ListBox.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <VirtualizingStackPanel></VirtualizingStackPanel>
+                                            </ItemsPanelTemplate>
+                                        </ListBox.ItemsPanel>
                                         <ListBox.ItemTemplate>
                                             <DataTemplate DataType="{x:Type models:ChatMessage}">
                                                 <TextBlock TextWrapping="Wrap">
