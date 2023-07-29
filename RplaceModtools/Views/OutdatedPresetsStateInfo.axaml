@@ -4,16 +4,15 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:viewModels="clr-namespace:RplaceModtools.ViewModels"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
-             x:Class="RplaceModtools.Views.SelectStateInfo">
+             x:Class="RplaceModtools.Views.OutdatedPresetsStateInfo">
     <Design.DataContext>
-        <viewModels:SelectStateInfoViewModel/>
+        <viewModels:OutdatedPresetsStateInfoViewModel/>
     </Design.DataContext>
     <UserControl.DataContext>
-        <viewModels:SelectStateInfoViewModel/>
+        <viewModels:OutdatedPresetsStateInfoViewModel/>
     </UserControl.DataContext>
-    
-    <StackPanel>
-        <Button>Clear all selections</Button>
-        <Button>Cycle primary selection</Button>
-    </StackPanel>
+  
+    <TextBlock Foreground="Yellow"
+        Text="{Binding OldPresetsPath,
+                StringFormat='⚠️ Warning: Outdated server presets found. New presets file has been generated, and old presets moved to: \'{0}\''}"></TextBlock>
 </UserControl>

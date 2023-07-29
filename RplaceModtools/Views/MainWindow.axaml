@@ -6,6 +6,7 @@
         xmlns:views="clr-namespace:RplaceModtools.Views"
         xmlns:rplaceModtools="clr-namespace:RplaceModtools"
         xmlns:models="clr-namespace:RplaceModtools.Models"
+        xmlns:componentModel="clr-namespace:CommunityToolkit.Mvvm.ComponentModel;assembly=CommunityToolkit.Mvvm"
         mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="600" MinWidth="400"
         x:Class="RplaceModtools.Views.MainWindow"
         Icon="/Assets/favicon.ico"
@@ -130,6 +131,15 @@
                             <TextBox Watermark="Live canvas path" Text="{Binding CurrentPreset.PlacePath}" />
                             
                             <TextBox Watermark="Server backups repository" Text="{Binding CurrentPreset.BackupsRepository}">
+                                <TextBox.IsVisible>
+                                    <Binding Path="CurrentPreset.LegacyServer" Converter="{StaticResource ValueEqualsConverter}">
+                                        <Binding.ConverterParameter>
+                                            <x:Boolean>True</x:Boolean>
+                                        </Binding.ConverterParameter>
+                                    </Binding>
+                                </TextBox.IsVisible>
+                            </TextBox>
+                            <TextBox Watermark="Backups repository main branch" Text="{Binding CurrentPreset.MainBranch}">
                                 <TextBox.IsVisible>
                                     <Binding Path="CurrentPreset.LegacyServer" Converter="{StaticResource ValueEqualsConverter}">
                                         <Binding.ConverterParameter>
@@ -306,18 +316,17 @@
                 <Border x:Name="CursorIndicatorRectangle" IsVisible="False" BorderBrush="Gray" CornerRadius="2" BorderThickness="1" Background="Transparent" Height="16" Width="16" Opacity="1"/>
             </Canvas>
             
-            <Border x:Name="ToolsInformation" IsVisible="{Binding StateInfo, Converter={x:Static ObjectConverters.IsNotNull}}" VerticalAlignment="Top" HorizontalAlignment="Right" BorderThickness="2" CornerRadius="8" Margin="16" Padding="8">
+            <Border x:Name="ToolsInformation" IsVisible="{Binding StateInfos, Converter={x:Static ObjectConverters.IsNotNull}}" VerticalAlignment="Top" HorizontalAlignment="Right" BorderThickness="2" CornerRadius="8" Margin="16" Padding="8">
                 <Border.Background>
                     <SolidColorBrush Color="Gray" Opacity="0.5" />
                 </Border.Background>
-                <ListBox ItemsSource="{Binding StateInfo}">
+                <ListBox ItemsSource="{Binding StateInfos}">
                     <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <TransitioningContentControl Content="{Binding }">
-                                <TransitioningContentControl.PageTransition>
-                                    <PageSlide Duration="0.1" />
-                                </TransitioningContentControl.PageTransition>
-                            </TransitioningContentControl>
+                        <DataTemplate DataType="componentModel:ObservableObject">
+                            <Button Command="{Binding DeleteStateInfoCommand,
+                                    RelativeSource={RelativeSource AncestorType=vm:MainWindowViewModel}}"
+                                    CommandParameter="{Binding}"
+                                Content="{Binding }"></Button>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>

@@ -21,7 +21,8 @@ namespace RplaceModtools
                 .AddSingleton<LiveCanvasStateInfoViewModel>()
                 .AddSingleton<PaintBrushStateInfoViewModel>()
                 .AddSingleton<SelectStateInfoViewModel>()
-                .AddTransient<LockedCanvasStateInfo>()
+                .AddSingleton<LockedCanvasStateInfoViewModel>()
+                .AddSingleton<OutdatedPresetsStateInfoViewModel>()
                 .BuildServiceProvider();
         }
 

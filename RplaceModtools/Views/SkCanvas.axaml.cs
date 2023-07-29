@@ -166,7 +166,11 @@ public partial class SkCanvas : UserControl
                 using var img = new SKBitmap((int)ParentSk.CanvasWidth, (int)ParentSk.CanvasHeight, true);
                 for (var i = 0; i < ParentSk.board.Length; i++)
                 {
-                    img.SetPixel((int)(i % ParentSk.CanvasWidth), (int)(i / ParentSk.CanvasWidth), PaletteViewModel.Colours[ParentSk.board[i]]);
+                    var colourI = ParentSk.board[i];
+                    if (colourI < PaletteViewModel.Colours.Length)
+                    {
+                        img.SetPixel((int)(i % ParentSk.CanvasWidth), (int)(i / ParentSk.CanvasWidth), PaletteViewModel.Colours[colourI]);
+                    }
                 }
 
                 ParentSk.boardCache = SKImage.FromBitmap(img);
@@ -237,8 +241,6 @@ public partial class SkCanvas : UserControl
                 }
 
                 ParentSk.selectionCanvasCache = SKImage.FromBitmap(img);
-                ParentSk.selectionBoard = null;
-                img.Dispose();
             }
             if (ParentSk.selectionCanvasCache is not null)
             {
@@ -248,24 +250,30 @@ public partial class SkCanvas : UserControl
             //Draw selections
             foreach (var sel in ParentSk.Selections)
             {
-                var sKBrush = new SKPaint();
-                sKBrush.Color = new SKColor(100, 167, 255, 140);
+                var sKBrush = new SKPaint
+                {
+                    Color = new SKColor(100, 167, 255, 140)
+                };
                 var selX = (float) Math.Floor(sel.TopLeft.X);
                 var selY = (float) Math.Floor(sel.TopLeft.Y);
                 var selWidth = (float) Math.Floor(sel.BottomRight.X - selX);
                 var selHeight = (float) Math.Floor(sel.BottomRight.Y - selY);
                 canvas.DrawRect(selX, selY, selWidth, selHeight, sKBrush);
 
-                using var selInfoPaint = new SKPaint();
-                selInfoPaint.TextSize = 18;
-                selInfoPaint.Color = SKColors.White;
-                selInfoPaint.IsAntialias = true;
-                using var selInfoOutlinePaint = new SKPaint();
-                selInfoOutlinePaint.TextSize = 18;
-                selInfoOutlinePaint.Color = SKColors.Black;
-                selInfoOutlinePaint.IsAntialias = true;
-                selInfoOutlinePaint.Style = SKPaintStyle.Stroke;
-                selInfoOutlinePaint.StrokeWidth = 2;
+                using var selInfoPaint = new SKPaint()
+                {
+                    TextSize = 18,
+                    Color = SKColors.White,
+                    IsAntialias = true
+                };
+                using var selInfoOutlinePaint = new SKPaint()
+                {
+                    TextSize = 18,
+                    Color = SKColors.Black,
+                    IsAntialias = true,
+                    Style = SKPaintStyle.Stroke,
+                    StrokeWidth = 2
+                };
                 canvas.DrawText($"({selX}, {selY}) {selWidth}x{selHeight}px", selX, selY, selInfoOutlinePaint);
                 canvas.DrawText($"({selX}, {selY}) {selWidth}x{selHeight}px", selX, selY, selInfoPaint);
 
@@ -335,9 +343,12 @@ public partial class SkCanvas : UserControl
             socketPixels = new byte[CanvasWidth * CanvasHeight];
             Array.Fill(socketPixels, (byte) 255);
         }
-        
-        socketPixels[pixel.Index] = pixel.Colour;
-        Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
+
+        if (pixel.Index < socketPixels.Length)
+        {
+            socketPixels[pixel.Index] = pixel.Colour;
+            Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
+        }
     }
     
     public void Unset(int x, int y)

@@ -4,9 +4,9 @@ using Avalonia.Markup.Xaml;
 
 namespace RplaceModtools.Views;
 
-public partial class SelectStateInfo : UserControl
+public partial class OutdatedPresetsStateInfo : UserControl
 {
-    public SelectStateInfo()
+    public OutdatedPresetsStateInfo()
     {
         InitializeComponent();
     }

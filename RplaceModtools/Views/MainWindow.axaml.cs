@@ -161,7 +161,7 @@ public partial class MainWindow : Window
                     if (cooldown == 0xFFFFFFFF)
                     {
                         Console.WriteLine("Canvas is locked (readonly). Edits can not be made.");
-                        viewModel.StateInfo.Add(App.Current.Services.GetRequiredService<LiveCanvasStateInfoViewModel>());
+                        viewModel.StateInfos.Add(App.Current.Services.GetRequiredService<LiveCanvasStateInfoViewModel>());
                     }
 
                     // New server packs canvas width and height in code 1, making it 17, equivalent to packet 2
@@ -252,7 +252,7 @@ public partial class MainWindow : Window
 
     private void RollbackArea(int x, int y, int regionWidth, int regionHeight, byte[] rollbackBoard)
     {
-        // TODO: This check is very very flawed
+        // TODO: Improve range checks here (even though server will likely fix regardless)
         if (regionWidth > 250 || regionHeight > 250 || x >= Board.CanvasWidth || y >= Board.CanvasHeight)
         {
             return;
@@ -293,7 +293,7 @@ public partial class MainWindow : Window
             {
                 Repository.Clone(viewModel.CurrentPreset.BackupsRepository, localPath, new CloneOptions
                 {
-                    BranchName = "main",
+                    BranchName = viewModel.CurrentPreset.MainBranch,
                 });
             }
             
@@ -407,13 +407,8 @@ public partial class MainWindow : Window
         _ = CreateConnection(UriCombine(viewModel.CurrentPreset.Websocket, viewModel.CurrentPreset.AdminKey));
         _ = Task.Run(async () =>
         {
-            var boardPath = UriCombine(viewModel.CurrentPreset.FileServer, viewModel.CurrentPreset.PlacePath);
-            var boardResponse = await Fetch(boardPath);
-            if (boardResponse is null)
-            {
-                throw new Exception("Initial board load failed. Board response was null");
-            }
-            
+            var boardPath = UriCombine(viewModel.CurrentPreset.FileServer, viewModel.CurrentPreset.MainBranch, viewModel.CurrentPreset.PlacePath);
+            var boardResponse = await Fetch(boardPath) ?? throw new Exception("Initial board load failed. Board response was null");
             boardFetchSource.SetResult(await boardResponse.Content.ReadAsByteArrayAsync());
             //PreviewImg.Source = await CreateCanvasPreviewImage(boardResponse);
         });
@@ -564,7 +559,7 @@ public partial class MainWindow : Window
                     return;
                 }
 
-                var topleft = Board.CurrentHandle switch
+                var topLeft = Board.CurrentHandle switch
                 {
                     SelectionHandle.TopLeft => new Point(Math.Min(mousePosition.X, Board.CurrentSelection.BottomRight.X - 4),
                             Math.Min(mousePosition.Y, Board.CurrentSelection.BottomRight.Y - 4)),
@@ -585,7 +580,7 @@ public partial class MainWindow : Window
                     _ => Board.CurrentSelection.BottomRight
                 };
 
-                Board.UpdateSelection(Board.CurrentSelection, topleft, bottomRight);
+                Board.UpdateSelection(Board.CurrentSelection, topLeft, bottomRight);
                 return;
             }
             if (PVM.CurrentColour is not null) //drag place pixels
@@ -649,15 +644,15 @@ public partial class MainWindow : Window
     }
 
     // HACK: Selection changed fires for no reason
-    private string previousBackup = "";
+    //private string previousBackup = "";
     
     private void OnCanvasDropdownSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (viewModel.CurrentBackup is null || viewModel.CurrentBackup == previousBackup)
-        {
-            return;
-        }
-        previousBackup = viewModel.CurrentBackup;
+        //if (viewModel.CurrentBackup is null || viewModel.CurrentBackup == previousBackup)
+        //{
+        //    return;
+        //}
+        //previousBackup = viewModel.CurrentBackup;
         
         Task.Run(async () =>
         {
@@ -699,8 +694,8 @@ public partial class MainWindow : Window
     /// </summary>
     private async Task ViewCanvasAtBackup(string backupName)
     {
-        var backupUri = viewModel.CurrentPreset.LegacyServer ?
-            UriCombine(viewModel.CurrentPreset.FileServer, backupName, viewModel.CurrentPreset.PlacePath)
+        var backupUri = viewModel.CurrentPreset.LegacyServer
+            ? UriCombine(viewModel.CurrentPreset.FileServer, backupName, viewModel.CurrentPreset.PlacePath)
             : UriCombine(viewModel.CurrentPreset.FileServer, viewModel.CurrentPreset.BackupsPath, backupName);
         
         var boardResponse = await Fetch(backupUri);
@@ -709,11 +704,10 @@ public partial class MainWindow : Window
             // TODO: Otherwise log that this has gone horrifically wrong
             Board.Board = await boardResponse.Content.ReadAsByteArrayAsync();
         }
-        
         Board.Changes = null;
-        Board.ClearSelections();
         
-        viewModel.StateInfo.Add(App.Current.Services.GetRequiredService<LockedCanvasStateInfoViewModel>());
+        var lockedInfo = App.Current.Services.GetRequiredService<LockedCanvasStateInfoViewModel>();
+        //viewModel.StateInfos.Add(lockedInfo); // TODO: For some reason this causes stack overflow
         //PreviewImg.Source = await CreateCanvasPreviewImage(backupUri) ?? new Bitmap("../Assets/preview_default.png");
     }
 
@@ -726,9 +720,8 @@ public partial class MainWindow : Window
     {
         await ViewMainCanvas();
         
-        var backupUri = viewModel.CurrentPreset.LegacyServer ?
-            // TODO: Remove hard code for this and make it part of the preset, something like git raw path
-            UriCombine(viewModel.CurrentPreset.FileServer, backupName, viewModel.CurrentPreset.PlacePath)
+        var backupUri = viewModel.CurrentPreset.LegacyServer
+            ? UriCombine(viewModel.CurrentPreset.FileServer, backupName, viewModel.CurrentPreset.PlacePath)
             : UriCombine(viewModel.CurrentPreset.FileServer, viewModel.CurrentPreset.BackupsPath, backupName);
         
         var backupResponse = await Fetch(backupUri);
@@ -804,7 +797,10 @@ public partial class MainWindow : Window
         if (radius == 1)
         {
             Board.Set(px);
-            if (socket is {IsRunning: true}) socket.Send(px.ToByteArray());
+            if (socket is { IsRunning: true })
+            {
+                socket.Send(px.ToByteArray());
+            }
             return;
         }
 
@@ -903,10 +899,12 @@ public partial class MainWindow : Window
         {
             return;
         }
-        
-        var sel = Board.Selections.Last();
-        RollbackArea((int) sel.TopLeft.X, (int) sel.TopLeft.Y, (int) sel.BottomRight.X - (int) sel.TopLeft.X, 
-            (int) sel.BottomRight.Y - (int) sel.TopLeft.Y, Board.SelectionBoard);
+
+        foreach (var selection in Board.Selections)
+        {
+            RollbackArea((int) selection.TopLeft.X, (int) selection.TopLeft.Y, (int) selection.BottomRight.X - (int) selection.TopLeft.X, 
+                (int) selection.BottomRight.Y - (int) selection.TopLeft.Y, Board.SelectionBoard);
+        }        
     }
 
     private void BackupCheckInterval()
@@ -991,7 +989,10 @@ public partial class MainWindow : Window
             chatBuilder.AppendLine("live");
             chatBuilder.AppendLine("0");
             chatBuilder.AppendLine("0");
-            socket?.Send(Encoding.UTF8.GetBytes("\x0f" + chatBuilder));
+            if (socket is { IsRunning: true })
+            {
+                socket.Send(Encoding.UTF8.GetBytes("\x0f" + chatBuilder));
+            }
         }
     }
     
@@ -1053,7 +1054,10 @@ public partial class MainWindow : Window
                 kickBuffer[2] = (byte) uidBytes.Length;
                 uidBytes.CopyTo(kickBuffer.AsSpan()[3..]);
                 reasonBytes.CopyTo(kickBuffer.AsSpan()[(3 + uidBytes.Length)..]);
-                socket?.Send(kickBuffer);
+                if (socket is { IsRunning: true })
+                {
+                    socket.Send(kickBuffer);
+                }
                 break;
             }
             case ModerationAction.Mute:
@@ -1067,7 +1071,10 @@ public partial class MainWindow : Window
                 muteBuffer[6] = (byte) uidBytes.Length;
                 uidBytes.CopyTo(muteBuffer.AsSpan()[7..]);
                 reasonBytes.CopyTo(muteBuffer.AsSpan()[(7 + uidBytes.Length)..]);
-                socket?.Send(muteBuffer);
+                if (socket is { IsRunning: true })
+                {
+                    socket.Send(muteBuffer);
+                }
                 break;
             }
             case ModerationAction.Ban:
@@ -1081,7 +1088,10 @@ public partial class MainWindow : Window
                 muteBuffer[6] = (byte) uidBytes.Length;
                 uidBytes.CopyTo(muteBuffer.AsSpan()[7..]);
                 reasonBytes.CopyTo(muteBuffer.AsSpan()[(7 + uidBytes.Length)..]);
-                socket?.Send(muteBuffer);
+                if (socket is { IsRunning: true })
+                {
+                    socket.Send(muteBuffer);
+                }
                 break;
             }
             case ModerationAction.Captcha:
@@ -1101,7 +1111,10 @@ public partial class MainWindow : Window
                 captchaBuffer[2] = (byte) uidBytesLength;
                 uidBytes?.CopyTo(captchaBuffer, 3);
                 reasonBytes.CopyTo(captchaBuffer, 3 + uidBytesLength);
-                socket?.Send(captchaBuffer);
+                if (socket is { IsRunning: true })
+                {
+                    socket.Send(captchaBuffer);
+                }
                 break;
             }
         }
