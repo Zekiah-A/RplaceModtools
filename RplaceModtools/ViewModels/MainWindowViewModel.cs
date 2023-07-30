@@ -45,7 +45,7 @@ public partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty] private ServerPreset? currentPreset;
     [ObservableProperty] private int currentPaintBrushRadius = 1;
-    [ObservableProperty] private Shape currentBrushShape = Shape.Square;
+    [ObservableProperty] private BrushShape currentBrushShape = BrushShape.Square;
     [ObservableProperty] private Tool currentTool = Tool.None;
 
     [ObservableProperty] private ObservableCollection<ObservableObject> stateInfos = new();
@@ -66,7 +66,6 @@ public partial class MainWindowViewModel : ObservableObject
         "https://raw.githubusercontent.com/rplacetk/canvas1/",
     };
     
-    public string? ChatUsername { get; set; }
     public Action<Pixel> BoardSetPixel { get; set; }
 
     public static readonly string ProgramDirectory =
@@ -112,7 +111,7 @@ public partial class MainWindowViewModel : ObservableObject
 
                         File.Move(presetPath, oldPresetsPath);
                         presets.Add(new ServerPreset());
-                        StateInfos.Add(App.Current.Services.GetRequiredService<OutdatedPresetsStateInfoViewModel>());
+                        AddStateInfo(App.Current.Services.GetRequiredService<OutdatedPresetsStateInfoViewModel>());
                         break;
                     }
                     
@@ -161,6 +160,7 @@ public partial class MainWindowViewModel : ObservableObject
         CurrentBackup = Backups.First();
         await FetchCacheBackupList();
         BackupCheckInterval();
+        StateInfoInterval();
     }
     
     private async Task FetchCacheBackupList()
@@ -228,6 +228,28 @@ public partial class MainWindowViewModel : ObservableObject
 
         timer.Start();
     }
+    
+    private void StateInfoInterval()
+    {
+        var timer = new Timer
+        {
+            AutoReset = true,
+            Interval = TimeSpan.FromSeconds(1).TotalMilliseconds
+        };
+
+        timer.Elapsed += (_, _) =>
+        {
+            foreach (var info in StateInfos)
+            {
+                if (info is ITransientStateInfo stateInfo && stateInfo.SpawnedOn + stateInfo.PersistsFor < DateTime.Now)
+                {
+                    StateInfos.Remove(info);
+                }
+            }
+        };
+
+        timer.Start();
+    }
 
     private async Task CreateConnection(Uri uri)
     {
@@ -262,7 +284,7 @@ public partial class MainWindowViewModel : ObservableObject
                     if (cooldown == 0xFFFFFFFF)
                     {
                         Console.WriteLine("Canvas is locked (readonly). Edits can not be made.");
-                        StateInfos.Add(App.Current.Services.GetRequiredService<LockedCanvasStateInfoViewModel>());
+                        AddStateInfo(App.Current.Services.GetRequiredService<LockedCanvasStateInfoViewModel>());
                     }
 
                     // New server packs canvas width and height in code 1, making it 17, equivalent to packet 2
@@ -322,7 +344,7 @@ public partial class MainWindowViewModel : ObservableObject
                             if (channelViewModel is null)
                             {
                                 channelViewModel = new LiveChatChannelViewModel(channelName);
-                                //LCVM.Channels.Add(channelViewModel);
+                                liveChatVm.Channels.Add(channelViewModel);
                             }
 
                             if (channelViewModel.Messages.Count > 100)
@@ -445,7 +467,7 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void SelectPaintTool()
     {
-        //StateInfo = App.Current.Services.GetRequiredService<PaintBrushStateInfoViewModel>();
+        AddStateInfo(App.Current.Services.GetRequiredService<PaintBrushStateInfoViewModel>());
         CurrentTool = Tool.PaintBrush;
     }
 
@@ -461,6 +483,19 @@ public partial class MainWindowViewModel : ObservableObject
     {
         //StateInfo.Remove();
         CurrentTool = Tool.Select;
+    }
+
+    [RelayCommand]
+    private void ViewSelectedBackup()
+    {
+        if (ViewSelectedBackupArea)
+        {
+            Task.Run(() => ViewCanvasBackupSelection(CurrentBackup));
+        }
+        else
+        {
+            Task.Run(() => ViewCanvasAtBackup(CurrentBackup));
+        }
     }
 
     partial void OnCurrentBackupChanged(string? oldValue, string? newValue)
@@ -520,8 +555,7 @@ public partial class MainWindowViewModel : ObservableObject
         Board = await boardResponse.Content.ReadAsByteArrayAsync();
         Changes = null;
         
-        var lockedInfo = App.Current.Services.GetRequiredService<LiveCanvasStateInfoViewModel>();
-        StateInfos.Add(lockedInfo);
+        AddStateInfo(App.Current.Services.GetRequiredService<LiveCanvasStateInfoViewModel>());
         //PreviewImg.Source = await CreateCanvasPreviewImage(backupUri) ?? new Bitmap("../Assets/preview_default.png");
     }
 
@@ -544,6 +578,21 @@ public partial class MainWindowViewModel : ObservableObject
         {
             SelectionBoard = await backupTask;
         }
+    }
+
+    private void AddStateInfo(ObservableObject stateInfo)
+    {
+        if (StateInfos.Contains(stateInfo))
+        {
+            if (stateInfo is ITransientStateInfo transientStateInfo)
+            {
+                transientStateInfo.SpawnedOn = DateTime.Now;
+            }
+            
+            return;
+        }
+
+        StateInfos.Add(stateInfo);
     }
 
     private static Uri UriCombine(params string[] parts)

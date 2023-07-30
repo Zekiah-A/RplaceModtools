@@ -17,4 +17,7 @@ public partial class ServerPreset : ObservableObject
     // New server only
     [ObservableProperty] private string backupListPath = "/backuplist";
     [ObservableProperty] private string backupsPath = "/backups/";
+    
+    // Mutable, will not create a new preset if changed
+    [ObservableProperty] private string? chatUsername = null;
 }

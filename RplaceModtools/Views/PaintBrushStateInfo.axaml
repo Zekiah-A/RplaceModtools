@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:viewModels="clr-namespace:RplaceModtools.ViewModels"
+             xmlns:models="clr-namespace:RplaceModtools.Models"
              xmlns:rplaceModtools="clr-namespace:RplaceModtools"
              mc:Ignorable="d"
              x:Class="RplaceModtools.Views.PaintBrushStateInfo">
@@ -16,14 +17,18 @@
     </UserControl.DataContext>
     
     <UserControl.Resources>
-        <rplaceModtools:ShapeEmojiConverter x:Key="ShapeEmojiConverter"/>
+        <rplaceModtools:EnumNameConverter x:Key="EnumNameConverter" />
     </UserControl.Resources>
   
-    <StackPanel x:Name="InfoPanel">
-        <Design.DataContext><viewModels:MainWindowViewModel/></Design.DataContext>
-        <TextBlock FontSize="16">Brush radius:</TextBlock>
-        <NumericUpDown Minimum="1" Maximum="4" Height="16" Value="{Binding CurrentPaintBrushRadius }"/>      
-        <TextBlock FontSize="16">Brush shape:</TextBlock>
-        <ToggleButton Content="{Binding CurrentBrushShape, Converter={StaticResource ShapeEmojiConverter}}"/>
+    <StackPanel x:Name="InfoPanel" MinWidth="240">
+        <Design.DataContext>
+            <viewModels:MainWindowViewModel/>
+        </Design.DataContext>
+        <TextBlock FontSize="16" Foreground="White">Brush radius:</TextBlock>
+        <NumericUpDown Minimum="1" Maximum="6" Height="16" Value="{Binding CurrentPaintBrushRadius }"/>      
+        <TextBlock FontSize="16" Foreground="White">Brush shape:</TextBlock>
+        
+        <ComboBox ItemsSource="{Binding Source={rplaceModtools:EnumBindingSource {x:Type models:BrushShape}}}"
+                  SelectedValue="{Binding CurrentBrushShape, Mode=TwoWay}" />
     </StackPanel>
 </UserControl>

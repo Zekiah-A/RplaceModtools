@@ -294,7 +294,7 @@ public partial class SkCanvas : UserControl
 
                 parent.selectionCanvasCache = SKImage.FromBitmap(img);
             }
-            if (parent.selectionCanvasCache is not null)
+            else if (parent.selectionCanvasCache is not null)
             {
                 canvas.DrawImage(parent.selectionCanvasCache, 0, 0);
             }

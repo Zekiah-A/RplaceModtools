@@ -179,6 +179,7 @@
                         </StackPanel>
                         <TextBlock FontSize="18" Margin="0 0 0 5">Client</TextBlock>
                         <TextBox x:Name="ConfigAdminKeyInput" RevealPassword="False" PasswordChar="*" Watermark="Admin key" Text="{Binding CurrentPreset.AdminKey}" Margin="0 0 0 5"/>
+                        <TextBox Watermark="Live chat username" Text="{Binding CurrentPreset.ChatUsername}" Margin="0 0 0 5"/>
                         <ScrollViewer>
                             <ListBox ItemsSource="{Binding ServerPresets}" SelectedItem="{Binding CurrentPreset, Mode=OneWayToSource}">
                                 <ListBox.Styles>
@@ -441,7 +442,17 @@
                                     <ToolTip.Tip>Automate canvas moderation actions with small scripts.</ToolTip.Tip>Macro Execution
                                 </ToggleButton>
                             </Grid>
-                            <ToggleSwitch x:Name="ViewSelectedBackup" IsChecked="{Binding ViewSelectedBackupArea}" Margin="5" Checked="OnViewSelectedBackupChecked" Unchecked="OnViewSelectedBackupUnchecked"><ToolTip.Tip>By turning this on, instead of viewing the whole canvas as the backup, only the area within your selection would peek through to the backup, allowing for easier visualisations of your rollback.</ToolTip.Tip>View selected area at backup</ToggleSwitch>
+                            <ToggleSwitch x:Name="ViewSelectedBackup"
+                                IsChecked="{Binding ViewSelectedBackupArea}"
+                                Command="{Binding ViewSelectedBackupCommand}"
+                                Margin="5">
+                                <ToolTip.Tip>
+                                    By turning this on, instead of viewing the whole canvas as the backup, only the area
+                                    within your selection would peek through to the backup, allowing for easier visualisations
+                                    of your rollback.
+                                </ToolTip.Tip>
+                                View selected area at backup
+                            </ToggleSwitch>
                             <Grid ColumnDefinitions="* Auto">
                                 <Button Grid.Column="0" Margin="5" HorizontalAlignment="Stretch" Click="OnRollbackButtonClicked">
                                     <ToolTip.Tip>Revert the selected area of the canvas to a previous date.</ToolTip.Tip>Rollback selected area

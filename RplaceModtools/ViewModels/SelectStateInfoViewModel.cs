@@ -4,5 +4,4 @@ namespace RplaceModtools.ViewModels;
 
 public partial class SelectStateInfoViewModel : ObservableObject
 {
-    
 }

@@ -20,7 +20,7 @@ namespace RplaceModtools
                 .AddSingleton<MainWindowViewModel>()
                 .AddSingleton<PaletteViewModel>()
                 .AddSingleton<LiveChatViewModel>()
-                .AddSingleton<LiveCanvasStateInfoViewModel>()
+                .AddTransient<LiveCanvasStateInfoViewModel>()
                 .AddSingleton<PaintBrushStateInfoViewModel>()
                 .AddSingleton<SelectStateInfoViewModel>()
                 .AddSingleton<LockedCanvasStateInfoViewModel>()

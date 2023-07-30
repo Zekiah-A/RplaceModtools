@@ -393,20 +393,6 @@ public partial class MainWindow : Window
         LookingAtPixel = pos;
     }
     
-    private void OnViewSelectedBackupChecked(object? sender, RoutedEventArgs e)
-    {
-        var backupName = CanvasDropdown.SelectedItem as string ?? "place";
-        Console.WriteLine("STUB CALLED: " + nameof(OnViewSelectedBackupChecked));
-        //Task.Run(() => ViewCanvasAtBackup(backupName));
-    }
-
-    private void OnViewSelectedBackupUnchecked(object? sender, RoutedEventArgs e)
-    {
-        var backupName = CanvasDropdown.SelectedItem as string ?? viewModel.CurrentPreset.PlacePath;
-        Console.WriteLine("STUB CALLED: " + nameof(OnViewSelectedBackupChecked));
-        //Task.Run(() => ViewCanvasBackupSelection(backupName));
-    }
-    
     private void OnResetCanvasViewPressed(object? sender, RoutedEventArgs e)
     {
         Board.Left = 0;
@@ -469,7 +455,7 @@ public partial class MainWindow : Window
 
         var brushStack = new Stack<Pixel>();
         var realPos = px.GetPosition(viewModel.CanvasWidth);
-        if (viewModel.CurrentBrushShape == Shape.Square)
+        if (viewModel.CurrentBrushShape == BrushShape.Circular)
         {
             var diameter = 2 * radius + 1;
 
@@ -507,7 +493,7 @@ public partial class MainWindow : Window
                 for (var y = 0 - radius / 2; y < radius / 2; y++)
                 {
                     var radiusPx = px.Clone();
-                    radiusPx.SetPosition(x, y, viewModel.CanvasWidth);
+                    radiusPx.SetPosition((uint)(realPos.X + x), (uint)(realPos.Y + y), viewModel.CanvasWidth);
                     Board.Set(radiusPx);
                     brushStack.Push(radiusPx);
                 }
@@ -611,6 +597,12 @@ public partial class MainWindow : Window
 
     private void SendChatInputMessage(string input)
     {
+        if (viewModel.CurrentPreset is null)
+        {
+            Console.WriteLine("Could not send chat message, current preset was null???");
+            return;
+        }
+        
         if (input.StartsWith(":help"))
         {
             liveChatVm.CurrentChannel.Messages.Add(new ChatMessage
@@ -621,15 +613,15 @@ public partial class MainWindow : Window
         }
         else if (input.StartsWith(":name"))
         {
-            viewModel.ChatUsername = ChatInput.Text[5..].Trim();
+            viewModel.CurrentPreset.ChatUsername = ChatInput.Text[5..].Trim();
             
             liveChatVm.CurrentChannel.Messages.Add(new ChatMessage
             {
                 Name = "!!",
-                Message = "Chat username set to " + viewModel.ChatUsername
+                Message = "Chat username set to " + viewModel.CurrentPreset.ChatUsername
             });
         }
-        else if (viewModel.ChatUsername is null)
+        else if (viewModel.CurrentPreset.ChatUsername is null)
         {
             liveChatVm.CurrentChannel.Messages.Add(new ChatMessage
             {
@@ -641,7 +633,7 @@ public partial class MainWindow : Window
         {
             var chatBuilder = new StringBuilder();
             chatBuilder.AppendLine(input);
-            chatBuilder.AppendLine(viewModel.ChatUsername);
+            chatBuilder.AppendLine(viewModel.CurrentPreset.ChatUsername);
             chatBuilder.AppendLine(liveChatVm.CurrentChannel.ChannelName);
             chatBuilder.AppendLine("live");
             chatBuilder.AppendLine("0");
