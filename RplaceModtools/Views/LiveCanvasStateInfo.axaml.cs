@@ -4,11 +4,11 @@ using RplaceModtools.ViewModels;
 
 namespace RplaceModtools.Views;
 
-public partial class CanvasStateInfo : UserControl
+public partial class LiveCanvasStateInfo : UserControl
 {
     private LiveCanvasStateInfoViewModel? viewModel;
 
-    public CanvasStateInfo()
+    public LiveCanvasStateInfo()
     {
         viewModel = App.Current.Services.GetRequiredService<LiveCanvasStateInfoViewModel>();
         DataContext = viewModel;

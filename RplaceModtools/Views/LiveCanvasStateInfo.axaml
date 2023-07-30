@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:viewModels="clr-namespace:RplaceModtools.ViewModels"
              mc:Ignorable="d"
-             x:Class="RplaceModtools.Views.CanvasStateInfo"
+             x:Class="RplaceModtools.Views.LiveCanvasStateInfo"
              HorizontalAlignment="Stretch"
              Height="16">
   
@@ -12,7 +12,7 @@
         <viewModels:LiveCanvasStateInfoViewModel/>
     </Design.DataContext>
     <UserControl.DataContext>
-            <viewModels:LiveCanvasStateInfoViewModel/>
+        <viewModels:LiveCanvasStateInfoViewModel/>
     </UserControl.DataContext>
   
     <TextBlock Foreground="Yellow">⚠️ Warning: You are not on the live canvas, therefore any edits will not be applied.</TextBlock>

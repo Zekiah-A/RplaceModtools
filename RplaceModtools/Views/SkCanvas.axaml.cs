@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
@@ -14,24 +15,49 @@ namespace RplaceModtools.Views;
 
 public partial class SkCanvas : UserControl
 {
-    public uint CanvasWidth = 500;
-    public uint CanvasHeight = 500;
-    public List<Selection> Selections = new(); // TODO: ReadonlyList
+    protected object selectionsLock = new();
+    public List<Selection> Selections = new();
     public SelectionHandle CurrentHandle = SelectionHandle.None;
     
     protected Selection? currentSelection;
-    protected byte[]? board;
-    protected byte[]? changes;
+    //protected byte[]? board;
+    //protected byte[]? changes;
     protected SKImage? boardCache;
     protected SKImage? changesCache;
     protected byte[]? socketPixels;
 
-    protected byte[]? selectionBoard;
+    //protected byte[]? selectionBoard;
     protected SKImage? selectionCanvasCache;
     protected float canvZoom = 1;
     protected SKPoint canvPosition = SKPoint.Empty;
     protected List<SKPaint> paints = new();
+    
+    public static readonly AvaloniaProperty<byte[]?> BoardProperty =
+        AvaloniaProperty.Register<SkCanvas, byte[]?>(nameof(Board), defaultValue: null);
 
+    public static readonly AvaloniaProperty<byte[]?> ChangesProperty =
+        AvaloniaProperty.Register<SkCanvas, byte[]?>(nameof(Changes), defaultValue: null);
+    
+    public static readonly AvaloniaProperty<uint> CanvasWidthProperty =
+        AvaloniaProperty.Register<SkCanvas, uint>(nameof(CanvasWidth), defaultValue: 500);
+
+    public static readonly AvaloniaProperty<uint> CanvasHeightProperty =
+        AvaloniaProperty.Register<SkCanvas, uint>(nameof(CanvasHeight), defaultValue: 500);
+    
+    public static readonly AvaloniaProperty<byte[]?> SelectionBoardProperty =
+        AvaloniaProperty.Register<SkCanvas, byte[]?>(nameof(SelectionBoard), defaultValue: null);
+
+    public uint CanvasWidth
+    {
+        get => (uint) GetValue(CanvasWidthProperty);
+        set => SetValue(CanvasWidthProperty, value);
+    }
+    public uint CanvasHeight
+    {
+        get => (uint) GetValue(CanvasHeightProperty);
+        set => SetValue(CanvasHeightProperty, value);
+    }
+    
     public byte[]? SocketPixels
     {
         get => socketPixels;
@@ -42,36 +68,38 @@ public partial class SkCanvas : UserControl
         }
     }
     
+    // TODO: depending on how slow GetValue is, this could really affect render performance, so perhaps make a tertirary
+    // TODO: property to hold board for internal use, perhaps bypassing get/setvalue
     public byte[]? Board
     {
-        get => board;
+        get => (byte[]?) GetValue(BoardProperty);
         set
         {
             // We have to invalidate the caches so that a new one can be generated
             boardCache = null;
-            board = value;
+            SetValue(BoardProperty, value);
             Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
         }
     }
 
     public byte[]? Changes
     {
-        get => changes;
+        get => (byte[]?) GetValue(ChangesProperty);
         set
         {
             // We have to invalidate the caches so that a new one can be generated
             changesCache = null;
-            changes = value;
+            SetValue(ChangesProperty, value);
             Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
         }
     }
 
     public byte[]? SelectionBoard
     {
-        get => selectionBoard;
+        get => (byte[]?) GetValue(SelectionBoardProperty);
         set
         {
-            selectionBoard = value;
+            SetValue(SelectionBoardProperty, value);
             selectionCanvasCache = null;
             Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
         }
@@ -130,14 +158,14 @@ public partial class SkCanvas : UserControl
 
     private class CustomDrawOp : ICustomDrawOperation
     {
-        private SkCanvas ParentSk { get; }
+        private SkCanvas parent { get; }
 
         public Rect Bounds { get; }
 
         public CustomDrawOp(Rect bounds, SkCanvas parentSk)
         {
             Bounds = bounds;
-            ParentSk = parentSk;
+            parent = parentSk;
         }
 
         public void Dispose() { }
@@ -157,47 +185,47 @@ public partial class SkCanvas : UserControl
             canvas.Save();
             
             //These must happen first because apparently it just works that way, idk.
-            canvas.Scale(ParentSk.canvZoom, ParentSk.canvZoom);
-            canvas.Translate(ParentSk.canvPosition.X, ParentSk.canvPosition.Y);
+            canvas.Scale(parent.canvZoom, parent.canvZoom);
+            canvas.Translate(parent.canvPosition.X, parent.canvPosition.Y);
 
             //Equivalent of renderAll
-            if (ParentSk.boardCache is null && ParentSk.board is not null)
+            if (parent.boardCache is null && parent.Board is not null)
             {
-                using var img = new SKBitmap((int)ParentSk.CanvasWidth, (int)ParentSk.CanvasHeight, true);
-                for (var i = 0; i < ParentSk.board.Length; i++)
+                using var img = new SKBitmap((int)parent.CanvasWidth, (int)parent.CanvasHeight, true);
+                for (var i = 0; i < Math.Min(parent.Board.Length, parent.CanvasWidth * parent.CanvasHeight); i++)
                 {
-                    var colourI = ParentSk.board[i];
+                    var colourI = parent.Board[i];
                     if (colourI < PaletteViewModel.Colours.Length)
                     {
-                        img.SetPixel((int)(i % ParentSk.CanvasWidth), (int)(i / ParentSk.CanvasWidth), PaletteViewModel.Colours[colourI]);
+                        img.SetPixel((int)(i % parent.CanvasWidth), (int)(i / parent.CanvasWidth), PaletteViewModel.Colours[colourI]);
                     }
                 }
 
-                ParentSk.boardCache = SKImage.FromBitmap(img);
+                parent.boardCache = SKImage.FromBitmap(img);
             }
-            if (ParentSk.changesCache is null && ParentSk.changes is not null)
+            if (parent.changesCache is null && parent.Changes is not null)
             {
-                using var img = new SKBitmap((int)ParentSk.CanvasWidth, (int)ParentSk.CanvasHeight);
-                for (var i = 0; i < ParentSk.changes.Length; i++)
+                using var img = new SKBitmap((int)parent.CanvasWidth, (int)parent.CanvasHeight);
+                for (var i = 0; i < Math.Min(parent.Changes.Length, parent.CanvasWidth * parent.CanvasHeight); i++)
                 {
-                    if (ParentSk.changes[i] == 0)
+                    if (parent.Changes[i] == 0)
                     {
                         continue;
                     }
                     
-                    img.SetPixel((int)(i % ParentSk.CanvasWidth), (int)(i / ParentSk.CanvasWidth), PaletteViewModel.Colours[ParentSk.changes[i]]);
+                    img.SetPixel((int)(i % parent.CanvasWidth), (int)(i / parent.CanvasWidth), PaletteViewModel.Colours[parent.Changes[i]]);
                 }
                 
-                ParentSk.changesCache = SKImage.FromBitmap(img);
+                parent.changesCache = SKImage.FromBitmap(img);
             }
 
-            if (ParentSk.boardCache is not null)
+            if (parent.boardCache is not null)
             {
-                canvas.DrawImage(ParentSk.boardCache, 0, 0);
+                canvas.DrawImage(parent.boardCache, 0, 0);
                 
-                if (ParentSk.changesCache is not null)
+                if (parent.changesCache is not null)
                 {
-                    canvas.DrawImage(ParentSk.changesCache, 0, 0);
+                    canvas.DrawImage(parent.changesCache, 0, 0);
                 }
             }
             else
@@ -215,40 +243,54 @@ public partial class SkCanvas : UserControl
             }
             
             //Draw all pixels that have come in to the canvas.
-            if (ParentSk.socketPixels is not null)
+            if (parent.socketPixels is not null)
             {
-                for (var c = 0; c < ParentSk.socketPixels.Length; c++)
+                for (var c = 0; c < parent.socketPixels.Length; c++)
                 {
-                    if (ParentSk.socketPixels[c] == 255) continue;
-                    canvas.DrawRect(c % ParentSk.CanvasWidth, c / ParentSk.CanvasWidth, 1, 1, ParentSk.paints[ParentSk.socketPixels[c]]);
+                    if (parent.socketPixels[c] == 255) continue;
+                    canvas.DrawRect(c % parent.CanvasWidth, c / parent.CanvasWidth, 1, 1, parent.paints[parent.socketPixels[c]]);
                 }
             }
             
-            if (ParentSk.selectionBoard is not null && ParentSk.selectionCanvasCache is null)
+            if (parent.SelectionBoard is not null && parent.selectionCanvasCache is null)
             {
-                using var img = new SKBitmap((int)ParentSk.CanvasWidth, (int)ParentSk.CanvasHeight);
-                for (var i = 0; i < ParentSk.selectionBoard.Length; i++)
+                using var img = new SKBitmap((int)parent.CanvasWidth, (int)parent.CanvasHeight);
+                var drawnPixel = false;
+                lock (parent.selectionsLock)
                 {
-                    //TODO: This method is not fully efficient and only attempting to draw at all within the selection bounds would be better.
-                    foreach (var sel in ParentSk.Selections
-                        .Where(sel => i % (ParentSk.CanvasWidth) >= sel.TopLeft.X
-                            && i % ParentSk.CanvasWidth <= sel.BottomRight.X
-                            && i / ParentSk.CanvasHeight >= sel.TopLeft.Y
-                            && i / ParentSk.CanvasHeight <= sel.BottomRight.Y))
+                    for (var i = 0; i < parent.SelectionBoard.Length; i++)
                     {
-                        img.SetPixel((int)(i % ParentSk.CanvasWidth), (int)(i / ParentSk.CanvasWidth), PaletteViewModel.Colours[ParentSk.selectionBoard[i]]);
+                        //TODO: This method is not fully efficient and only attempting to draw at all within the selection bounds would be better.
+                        foreach (var sel in parent.Selections)
+                        {
+                            if (drawnPixel)
+                            {
+                                continue;
+                            }
+                            
+                            if (i % parent.CanvasWidth >= sel.TopLeft.X
+                                && i % parent.CanvasWidth <= sel.BottomRight.X
+                                && i / parent.CanvasHeight >= sel.TopLeft.Y
+                                && i / parent.CanvasHeight <= sel.BottomRight.Y)
+                            {
+                                img.SetPixel((int)(i % parent.CanvasWidth), (int)(i / parent.CanvasWidth), PaletteViewModel.Colours[parent.SelectionBoard[i]]);
+                                drawnPixel = true;
+                            }
+                        }
+                        
+                        drawnPixel = false;
                     }
                 }
 
-                ParentSk.selectionCanvasCache = SKImage.FromBitmap(img);
+                parent.selectionCanvasCache = SKImage.FromBitmap(img);
             }
-            if (ParentSk.selectionCanvasCache is not null)
+            if (parent.selectionCanvasCache is not null)
             {
-                canvas.DrawImage(ParentSk.selectionCanvasCache, 0, 0);
+                canvas.DrawImage(parent.selectionCanvasCache, 0, 0);
             }
             
             //Draw selections
-            foreach (var sel in ParentSk.Selections)
+            foreach (var sel in parent.Selections)
             {
                 var sKBrush = new SKPaint
                 {
@@ -277,7 +319,7 @@ public partial class SkCanvas : UserControl
                 canvas.DrawText($"({selX}, {selY}) {selWidth}x{selHeight}px", selX, selY, selInfoOutlinePaint);
                 canvas.DrawText($"({selX}, {selY}) {selWidth}x{selHeight}px", selX, selY, selInfoPaint);
 
-                if (sel == ParentSk.currentSelection)
+                if (sel == parent.currentSelection)
                 {
                     using var selHandlePoint = new SKPaint
                     {
@@ -304,13 +346,17 @@ public partial class SkCanvas : UserControl
     
     public Selection StartSelection(Point topLeft, Point bottomRight)
     {
+
         var sel = new Selection
         {
             TopLeft = topLeft,
             BottomRight = bottomRight
         };
-        
-        Selections.Add(sel);
+
+        lock (selectionsLock)
+        {
+            Selections.Add(sel);
+        }
         Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
         return sel;
     }
@@ -325,13 +371,22 @@ public partial class SkCanvas : UserControl
 
     public void RemoveSelection(Selection selection)
     {
-        Selections.Remove(selection);
+        lock (selectionsLock)
+        {
+            Selections.Remove(selection);
+        }
+
+        selectionCanvasCache = null;
         Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
     }
 
     public void ClearSelections()
     {
-        Selections.Clear();
+        lock (selectionsLock)
+        {
+            Selections.Clear();
+        }
+
         selectionCanvasCache = null;
         Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
     }

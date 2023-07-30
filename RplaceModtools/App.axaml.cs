@@ -18,6 +18,8 @@ namespace RplaceModtools
             Services = new ServiceCollection()
                 .AddSingleton<MainWindow>()
                 .AddSingleton<MainWindowViewModel>()
+                .AddSingleton<PaletteViewModel>()
+                .AddSingleton<LiveChatViewModel>()
                 .AddSingleton<LiveCanvasStateInfoViewModel>()
                 .AddSingleton<PaintBrushStateInfoViewModel>()
                 .AddSingleton<SelectStateInfoViewModel>()

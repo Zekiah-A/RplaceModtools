@@ -1,6 +1,8 @@
+using CommunityToolkit.Mvvm.ComponentModel;
+
 namespace RplaceModtools.ViewModels;
 
-public class SelectStateInfoViewModel
+public partial class SelectStateInfoViewModel : ObservableObject
 {
     
 }
