@@ -520,8 +520,8 @@ public partial class MainWindowViewModel : ObservableObject
         Board = await boardResponse.Content.ReadAsByteArrayAsync();
         Changes = null;
         
-        var lockedInfo = App.Current.Services.GetRequiredService<LockedCanvasStateInfoViewModel>();
-        StateInfos.Add(lockedInfo); // TODO: For some reason this causes stack overflow
+        var lockedInfo = App.Current.Services.GetRequiredService<LiveCanvasStateInfoViewModel>();
+        StateInfos.Add(lockedInfo);
         //PreviewImg.Source = await CreateCanvasPreviewImage(backupUri) ?? new Bitmap("../Assets/preview_default.png");
     }
 

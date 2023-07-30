@@ -18,46 +18,94 @@ public partial class SkCanvas : UserControl
     protected object selectionsLock = new();
     public List<Selection> Selections = new();
     public SelectionHandle CurrentHandle = SelectionHandle.None;
-    
-    protected Selection? currentSelection;
-    //protected byte[]? board;
-    //protected byte[]? changes;
+
+    protected uint canvasWidth = 500;
+    protected uint canvasHeight = 500;
+    protected byte[]? board = null;
+    protected byte[]? changes = null;
+    protected byte[]? selectionBoard = null;
     protected SKImage? boardCache;
     protected SKImage? changesCache;
+    protected SKImage? selectionCanvasCache;
     protected byte[]? socketPixels;
 
-    //protected byte[]? selectionBoard;
-    protected SKImage? selectionCanvasCache;
+    protected Selection? currentSelection;
     protected float canvZoom = 1;
     protected SKPoint canvPosition = SKPoint.Empty;
     protected List<SKPaint> paints = new();
     
-    public static readonly AvaloniaProperty<byte[]?> BoardProperty =
-        AvaloniaProperty.Register<SkCanvas, byte[]?>(nameof(Board), defaultValue: null);
+    public static readonly DirectProperty<SkCanvas, byte[]?> BoardProperty =
+        AvaloniaProperty.RegisterDirect<SkCanvas, byte[]?>(nameof(Board),
+            instance => instance.Board,
+            (instance, value) => instance.Board = value);
 
-    public static readonly AvaloniaProperty<byte[]?> ChangesProperty =
-        AvaloniaProperty.Register<SkCanvas, byte[]?>(nameof(Changes), defaultValue: null);
+    public static readonly DirectProperty<SkCanvas, byte[]?> ChangesProperty =
+        AvaloniaProperty.RegisterDirect<SkCanvas, byte[]?>(nameof(Changes),
+            instance => instance.Changes,
+            (instance, value) => instance.Changes = value);
     
-    public static readonly AvaloniaProperty<uint> CanvasWidthProperty =
-        AvaloniaProperty.Register<SkCanvas, uint>(nameof(CanvasWidth), defaultValue: 500);
+    public static readonly DirectProperty<SkCanvas, uint> CanvasWidthProperty =
+        AvaloniaProperty.RegisterDirect<SkCanvas, uint>(nameof(CanvasWidth),
+            instance => instance.CanvasWidth,
+            (instance, value) => instance.CanvasWidth = value);
 
-    public static readonly AvaloniaProperty<uint> CanvasHeightProperty =
-        AvaloniaProperty.Register<SkCanvas, uint>(nameof(CanvasHeight), defaultValue: 500);
+    public static readonly DirectProperty<SkCanvas, uint> CanvasHeightProperty =
+        AvaloniaProperty.RegisterDirect<SkCanvas, uint>(nameof(CanvasHeight),
+            instance => instance.CanvasHeight,
+            (instance, value) => instance.CanvasHeight = value);
     
-    public static readonly AvaloniaProperty<byte[]?> SelectionBoardProperty =
-        AvaloniaProperty.Register<SkCanvas, byte[]?>(nameof(SelectionBoard), defaultValue: null);
+    public static readonly DirectProperty<SkCanvas, byte[]?> SelectionBoardProperty =
+        AvaloniaProperty.RegisterDirect<SkCanvas, byte[]?>(nameof(SelectionBoard),
+            instance => instance.SelectionBoard,
+            (instance, value) => instance.SelectionBoard = value);
+    
+    // Binding redraw triggering control properties 
+    public byte[]? Board
+    {
+        get => board;
+        set
+        {
+            boardCache = null;
+            SetAndRaise(BoardProperty, ref board, value);
+            Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
+        }
+    }
 
+    public byte[]? Changes
+    {
+        get => changes;
+        set
+        {
+            changesCache = null;
+            SetAndRaise(ChangesProperty, ref changes, value);
+            Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
+        }
+    }
+    
+    public byte[]? SelectionBoard
+    {
+        get => selectionBoard;
+        set
+        {
+            selectionCanvasCache = null;
+            SetAndRaise(SelectionBoardProperty, ref selectionBoard, value);
+            Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
+        }
+    }
+    
     public uint CanvasWidth
     {
-        get => (uint) GetValue(CanvasWidthProperty);
-        set => SetValue(CanvasWidthProperty, value);
-    }
-    public uint CanvasHeight
-    {
-        get => (uint) GetValue(CanvasHeightProperty);
-        set => SetValue(CanvasHeightProperty, value);
+        get => canvasWidth;
+        set => SetAndRaise(CanvasWidthProperty, ref canvasWidth, value);
     }
     
+    public uint CanvasHeight
+    {
+        get => canvasHeight;
+        set => SetAndRaise(CanvasHeightProperty, ref canvasHeight, value);
+    }
+    
+    // Non-binding redraw triggering control properties 
     public byte[]? SocketPixels
     {
         get => socketPixels;
@@ -67,44 +115,7 @@ public partial class SkCanvas : UserControl
             Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
         }
     }
-    
-    // TODO: depending on how slow GetValue is, this could really affect render performance, so perhaps make a tertirary
-    // TODO: property to hold board for internal use, perhaps bypassing get/setvalue
-    public byte[]? Board
-    {
-        get => (byte[]?) GetValue(BoardProperty);
-        set
-        {
-            // We have to invalidate the caches so that a new one can be generated
-            boardCache = null;
-            SetValue(BoardProperty, value);
-            Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
-        }
-    }
 
-    public byte[]? Changes
-    {
-        get => (byte[]?) GetValue(ChangesProperty);
-        set
-        {
-            // We have to invalidate the caches so that a new one can be generated
-            changesCache = null;
-            SetValue(ChangesProperty, value);
-            Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
-        }
-    }
-
-    public byte[]? SelectionBoard
-    {
-        get => (byte[]?) GetValue(SelectionBoardProperty);
-        set
-        {
-            SetValue(SelectionBoardProperty, value);
-            selectionCanvasCache = null;
-            Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
-        }
-    }
-    
     public float Top
     {
         get => canvPosition.Y;
@@ -147,13 +158,12 @@ public partial class SkCanvas : UserControl
     public SkCanvas()
     {
         InitializeComponent();
+        
         ClipToBounds = true;
-        foreach (var col in PaletteViewModel.Colours) paints.Add(new SKPaint { Color = col });
-    }
-
-    private void InitializeComponent()
-    {
-        AvaloniaXamlLoader.Load(this);
+        foreach (var col in PaletteViewModel.Colours)
+        {
+            paints.Add(new SKPaint { Color = col });
+        }
     }
 
     private class CustomDrawOp : ICustomDrawOperation

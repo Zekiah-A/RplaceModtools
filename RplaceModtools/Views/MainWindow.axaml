@@ -329,15 +329,33 @@
             </Canvas>
             
             <!--Change this border into just the listbox, put the border around each element-->
-            <ListBox Classes="StateInfo" ItemsSource="{Binding StateInfos}" SelectedItem="{Binding SelectedStateInfo}" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="16">
-                <!--<ListBox.ItemTemplate>
-                    <DataTemplate DataType="componentModel:ObservableObject">
-                        <Button Command="{Binding DeleteStateInfoCommand, RelativeSource={RelativeSource AncestorType=vm:MainWindowViewModel}}"
-                                CommandParameter="{Binding}"
-                                Content="{Binding }"
-                                Background="Transparent" Padding="0" Margin="0"></Button>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>-->
+            <ListBox Classes="StateInfo" ItemsSource="{Binding StateInfos}"
+                     SelectedItem="{Binding SelectedStateInfo}" VerticalAlignment="Top"
+                     HorizontalAlignment="Right" Margin="16">
+                <ListBox.Styles>
+                    <Style Selector="ListBoxItem">
+                        <Setter Property="Border.CornerRadius" Value="8"/>
+                        <Setter Property="Margin" Value="4"/>
+                        <Setter Property="Background">
+                            <Setter.Value>
+                                <SolidColorBrush Color="Gray" Opacity="0.5" />
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                    <Style Selector="ListBoxItem:selected">
+                        <Setter Property="Border.CornerRadius" Value="8"/>
+                        <Setter Property="Margin" Value="4"/>
+                    </Style>
+                    <Style Selector="ListBoxItem:pointerover">
+                        <Setter Property="Border.CornerRadius" Value="8"/>
+                        <Setter Property="Margin" Value="4"/>
+                        <Setter Property="Background">
+                            <Setter.Value>
+                                <SolidColorBrush Color="Gray" Opacity="0.8" />
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListBox.Styles>
             </ListBox>
             
             <Button ZIndex="3" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="10" Padding="10" Click="OnSelectColourClicked">Select Colour</Button>
