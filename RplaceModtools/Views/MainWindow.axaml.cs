@@ -50,8 +50,8 @@ public partial class MainWindow : Window
     }
 
     private Point MouseOverPixel(PointerEventArgs e) => new(
-        (int) Math.Clamp(Math.Floor(e.GetPosition(CanvasBackground).X - Board.Left * Board.Zoom), 0, viewModel.CanvasWidth),
-        (int) Math.Clamp(Math.Floor(e.GetPosition(CanvasBackground).Y - Board.Top * Board.Zoom), 0, viewModel.CanvasHeight)
+        (int) Math.Clamp(Math.Floor((e.GetPosition(CanvasBackground).X - Board.Left) * Board.Zoom), 0, viewModel.CanvasWidth),
+        (int) Math.Clamp(Math.Floor((e.GetPosition(CanvasBackground).Y - Board.Top) * Board.Zoom), 0, viewModel.CanvasHeight)
     );
 
     public MainWindow()

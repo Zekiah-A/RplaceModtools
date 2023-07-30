@@ -73,6 +73,7 @@ public partial class MainWindowViewModel : ObservableObject
     private static readonly string presetPath =
         Path.Join(ProgramDirectory, "server_presets.txt");
     private readonly HttpClient client = new();
+    private readonly object stateInfosLock = new();
     private const int PresetVersion = 0;
 
     public ObservableCollection<ServerPreset> ServerPresets
@@ -239,11 +240,16 @@ public partial class MainWindowViewModel : ObservableObject
 
         timer.Elapsed += (_, _) =>
         {
-            foreach (var info in StateInfos)
+            lock (stateInfosLock)
             {
-                if (info is ITransientStateInfo stateInfo && stateInfo.SpawnedOn + stateInfo.PersistsFor < DateTime.Now)
+                var statesToRemove = StateInfos
+                    .Where(info => info is ITransientStateInfo stateInfo
+                        && stateInfo.SpawnedOn + stateInfo.PersistsFor < DateTime.Now)
+                    .ToList();
+
+                foreach (var stateToRemove in statesToRemove)
                 {
-                    StateInfos.Remove(info);
+                    StateInfos.Remove(stateToRemove);
                 }
             }
         };
@@ -408,9 +414,12 @@ public partial class MainWindowViewModel : ObservableObject
 
     partial void OnSelectedStateInfoChanged(ObservableObject? oldValue, ObservableObject? newValue)
     {
-        if (newValue is not null)
+        lock (stateInfosLock)
         {
-            StateInfos.Remove(newValue);
+            if (newValue is not null)
+            {
+                StateInfos.Remove(newValue);
+            }
         }
     }
     
@@ -582,17 +591,20 @@ public partial class MainWindowViewModel : ObservableObject
 
     private void AddStateInfo(ObservableObject stateInfo)
     {
-        if (StateInfos.Contains(stateInfo))
+        lock (stateInfosLock)
         {
-            if (stateInfo is ITransientStateInfo transientStateInfo)
+            if (StateInfos.Contains(stateInfo))
             {
-                transientStateInfo.SpawnedOn = DateTime.Now;
+                if (stateInfo is ITransientStateInfo transientStateInfo)
+                {
+                    transientStateInfo.SpawnedOn = DateTime.Now;
+                }
+                
+                return;
             }
-            
-            return;
-        }
 
-        StateInfos.Add(stateInfo);
+            StateInfos.Add(stateInfo);
+        }
     }
 
     private static Uri UriCombine(params string[] parts)
