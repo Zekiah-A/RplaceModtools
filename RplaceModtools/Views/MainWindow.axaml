@@ -181,7 +181,7 @@
                         <TextBox x:Name="ConfigAdminKeyInput" RevealPassword="False" PasswordChar="*" Watermark="Admin key" Text="{Binding CurrentPreset.AdminKey}" Margin="0 0 0 5"/>
                         <TextBox Watermark="Live chat username" Text="{Binding CurrentPreset.ChatUsername}" Margin="0 0 0 5"/>
                         <ScrollViewer>
-                            <ListBox ItemsSource="{Binding ServerPresets}" SelectedItem="{Binding CurrentPreset, Mode=OneWayToSource}">
+                            <ListBox ItemsSource="{Binding ServerPresets}" SelectedItem="{Binding CurrentPreset}">
                                 <ListBox.Styles>
                                     <Style Selector="ListBox">
                                         <Setter Property="Background" Value="Transparent"></Setter>

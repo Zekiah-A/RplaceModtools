@@ -4,6 +4,8 @@ namespace RplaceModtools.Models;
 
 public partial class ServerPreset : ObservableObject
 {
+    public static readonly ServerPreset Default = new();
+
     [ObservableProperty] private bool legacyServer = true;
     [ObservableProperty] private string websocket = "wss://server.rplace.tk:443";
     [ObservableProperty] private string fileServer = "https://raw.githubusercontent.com/rplacetk/canvas1/";

@@ -20,16 +20,16 @@
         <TrimmableAssembly Include="Avalonia.Themes.Default" />
     </ItemGroup>
     <ItemGroup>
-        <PackageReference Include="Avalonia" Version="11.0.0" />
-        <PackageReference Include="Avalonia.Desktop" Version="11.0.0" />
+        <PackageReference Include="Avalonia" Version="11.0.2" />
+        <PackageReference Include="Avalonia.Desktop" Version="11.0.2" />
         <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
-        <PackageReference Condition="'$(Configuration)' == 'Debug'" Include="Avalonia.Diagnostics" Version="11.0.0" />
-        <PackageReference Include="Avalonia.Themes.Fluent" Version="11.0.0" />
+        <PackageReference Condition="'$(Configuration)' == 'Debug'" Include="Avalonia.Diagnostics" Version="11.0.2" />
+        <PackageReference Include="Avalonia.Themes.Fluent" Version="11.0.2" />
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.1" />
         <PackageReference Include="DynamicData" Version="7.14.2" />
         <PackageReference Include="LibGit2Sharp" Version="0.27.2" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0-preview.6.23329.7" />
-        <PackageReference Include="SkiaSharp.Views.Desktop.Common" Version="2.88.4-preview.84" />
+        <PackageReference Include="SkiaSharp.Views.Desktop.Common" Version="2.88.4-preview.89" />
         <PackageReference Include="Websocket.Client" Version="4.6.1" />
     </ItemGroup>
 </Project>

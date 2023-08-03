@@ -43,7 +43,8 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private string currentModerationReason = "";
     [ObservableProperty] private string currentModerationUid = "";
 
-    [ObservableProperty] private ServerPreset? currentPreset;
+    [ObservableProperty] private ObservableCollection<ServerPreset> serverPresets;
+    [ObservableProperty] private ServerPreset currentPreset = new();
     [ObservableProperty] private int currentPaintBrushRadius = 1;
     [ObservableProperty] private BrushShape currentBrushShape = BrushShape.Square;
     [ObservableProperty] private Tool currentTool = Tool.None;
@@ -76,68 +77,11 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly object stateInfosLock = new();
     private const int PresetVersion = 0;
 
-    public ObservableCollection<ServerPreset> ServerPresets
+    public MainWindowViewModel()
     {
-        get
-        {
-            var presets = new ObservableCollection<ServerPreset>();
-            if (!File.Exists(presetPath))
-            {
-                Directory.CreateDirectory(ProgramDirectory);
-                File.WriteAllText(presetPath, PresetVersion + "\n");
-                return presets;
-            }
-
-            var lines = File.ReadAllLines(presetPath);
-            for (var i = 0; i < lines.Length; i++)
-            {
-                var line = lines[i];
-                if (string.IsNullOrEmpty(line))
-                {
-                    continue;
-                }
-
-                if (i == 0)
-                {
-                    if (!int.TryParse(line, out var presetVersion) || presetVersion < PresetVersion)
-                    {
-                        Console.WriteLine("Preset version was below current preset version, dumping and upgrading");
-                        Console.WriteLine("Old presets:" + string.Join("  \n", lines));
-                        
-                        var oldPresetsPath = Path.Join(Directory.GetCurrentDirectory(), "server_presets_old.txt");
-                        if (File.Exists(oldPresetsPath))
-                        {
-                            File.Delete(oldPresetsPath);
-                        }
-
-                        File.Move(presetPath, oldPresetsPath);
-                        presets.Add(new ServerPreset());
-                        AddStateInfo(App.Current.Services.GetRequiredService<OutdatedPresetsStateInfoViewModel>());
-                        break;
-                    }
-                    
-                    continue;
-                }
-
-                var set = line.Split(",");
-                presets.Add(new ServerPreset
-                {
-                    Websocket = set.ElementAtOrDefault(0)!,
-                    FileServer = set.ElementAtOrDefault(1)!,
-                    AdminKey = set.ElementAtOrDefault(2)!,
-                    BackupListPath = set.ElementAtOrDefault(3) ?? "/backuplist",
-                    PlacePath = set.ElementAtOrDefault(4) ?? "/place",
-                    BackupsPath = set.ElementAtOrDefault(5) ?? "/backups",
-                    LegacyServer = bool.TryParse(set.ElementAtOrDefault(6), out _) && bool.Parse(set.ElementAtOrDefault(6)!),
-                    BackupsRepository = set.ElementAtOrDefault(7) ?? "https://github.com/rplacetk/canvas1.git",
-                    MainBranch = set.ElementAtOrDefault(8) ?? "main"
-                });
-            }
-            
-            return presets;
-        }
+        ServerPresets = LoadGeneratePresets();
     }
-    
+
     [RelayCommand]
     private async Task Start()
     {
@@ -166,7 +110,7 @@ public partial class MainWindowViewModel : ObservableObject
     
     private async Task FetchCacheBackupList()
     {
-        if (CurrentPreset.LegacyServer)
+        if (CurrentPreset!.LegacyServer)
         {
             var nameMatches = RepositoryNameRegex().Match(CurrentPreset.BackupsRepository).Groups.Values.First();
             var invalidChars = new string(Path.GetInvalidFileNameChars());
@@ -255,6 +199,64 @@ public partial class MainWindowViewModel : ObservableObject
         };
 
         timer.Start();
+    }
+
+    private ObservableCollection<ServerPreset> LoadGeneratePresets()
+    {
+        var presets = new ObservableCollection<ServerPreset>();
+        if (!File.Exists(presetPath))
+        {
+            Directory.CreateDirectory(ProgramDirectory);
+            File.WriteAllText(presetPath, PresetVersion + "\n");
+            presets.Add(new ServerPreset());
+            return presets;
+        }
+
+        var lines = File.ReadAllLines(presetPath);
+        
+        if (lines.Length == 0 || !int.TryParse(lines.First(), out var presetVersion) || presetVersion < PresetVersion)
+        {
+            Console.WriteLine("Preset version was below current preset version, dumping and upgrading");
+            Console.WriteLine("Old presets:" + string.Join("  \n", lines));
+                    
+            var oldPresetsPath = Path.Join(Directory.GetCurrentDirectory(), "server_presets_old.txt");
+            if (File.Exists(oldPresetsPath))
+            {
+                File.Delete(oldPresetsPath);
+            }
+
+            File.Move(presetPath, oldPresetsPath);
+            presets.Add(new ServerPreset());
+            AddStateInfo(App.Current.Services.GetRequiredService<OutdatedPresetsStateInfoViewModel>());
+            return presets;
+        }
+        
+        for (var i = 1; i < lines.Length; i++)
+        {
+            var line = lines[i];
+            if (string.IsNullOrEmpty(line))
+            {
+                continue;
+            }
+            
+            var set = line.Split(",");
+            presets.Add(new ServerPreset
+            {
+                Websocket = set.ElementAtOrDefault(0) ?? ServerPreset.Default.Websocket,
+                FileServer = set.ElementAtOrDefault(1) ?? ServerPreset.Default.FileServer,
+                AdminKey = set.ElementAtOrDefault(2) ?? ServerPreset.Default.AdminKey,
+                BackupListPath = set.ElementAtOrDefault(3) ?? ServerPreset.Default.BackupListPath,
+                PlacePath = set.ElementAtOrDefault(4) ?? ServerPreset.Default.PlacePath,
+                BackupsPath = set.ElementAtOrDefault(5) ?? ServerPreset.Default.BackupsPath,
+                LegacyServer = bool.TryParse(set.ElementAtOrDefault(6), out _)
+                    && bool.Parse(set.ElementAtOrDefault(6) ?? true.ToString()),
+                BackupsRepository = set.ElementAtOrDefault(7) ?? ServerPreset.Default.BackupsRepository,
+                MainBranch = set.ElementAtOrDefault(8) ?? ServerPreset.Default.MainBranch,
+                ChatUsername = set.ElementAtOrDefault(9) ?? ServerPreset.Default.ChatUsername
+            });
+        }
+        
+        return presets;
     }
 
     private async Task CreateConnection(Uri uri)
@@ -428,12 +430,12 @@ public partial class MainWindowViewModel : ObservableObject
         if (!File.Exists(presetPath))
         {
             Directory.CreateDirectory(ProgramDirectory);
-            File.WriteAllText(presetPath, PresetVersion.ToString() + "\n");
+            File.WriteAllText(presetPath, PresetVersion + "\n");
         }
 
         var contents = preset.Websocket + "," + preset.FileServer + "," + preset.AdminKey + ","
             + preset.BackupListPath + "," + preset.PlacePath + "," + preset.BackupsPath + "," + preset.LegacyServer + ","
-            + preset.BackupsRepository + "," + preset.MainBranch + "\n";
+            + preset.BackupsRepository + "," + preset.MainBranch + "," + preset.ChatUsername + "\n";
         File.AppendAllText(presetPath, contents);
     }
 
