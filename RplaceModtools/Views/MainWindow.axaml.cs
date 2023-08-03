@@ -16,6 +16,7 @@ using RplaceModtools.Models;
 using SkiaSharp;
 using RplaceModtools.ViewModels;
 using Timer = System.Timers.Timer;
+using Avalonia.Themes.Fluent;
 
 namespace RplaceModtools.Views;
 public partial class MainWindow : Window
@@ -511,13 +512,6 @@ public partial class MainWindow : Window
                 }
             }
         });
-    }
-
-    private void OnToggleThemePressed(object? sender, RoutedEventArgs e)
-    {
-        // TODO: Fix light/dark theme
-        //var currentStyle = (FluentTheme) Application.Current?.Styles[0]!;
-        //currentStyle.Mode = currentStyle.Mode == FluentThemeMode.Dark ? FluentThemeMode.Light : FluentThemeMode.Dark;
     }
 
     private void OnOpenGithubClicked(object? sender, RoutedEventArgs e)

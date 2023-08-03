@@ -13,7 +13,8 @@
         Title="RplaceModtools"
         TransparencyLevelHint="AcrylicBlur"
         TransparencyBackgroundFallback="DarkGray"
-        Background="DarkGray">
+        Background="DarkGray"
+        RequestedThemeVariant="{Binding CurrentTheme}">
         <!--Background="Transparent"-->
         
     <Window.Styles>
@@ -526,7 +527,7 @@
                     <MenuFlyout Placement="Bottom">
                         <MenuItem Header="Settings">
                             <MenuItem Header="Enable cache place files" IsEnabled="False"/>
-                            <MenuItem Header="Toggle dark mode" Click="OnToggleThemePressed"/>
+                            <MenuItem Header="Toggle dark mode" Command="{Binding ToggleThemeCommand}"/>
                             <MenuItem Header="Toggle backup check interval" IsEnabled="False"/>
                             <MenuItem Header="Reset canvas view" Click="OnResetCanvasViewPressed"/>
                         </MenuItem>

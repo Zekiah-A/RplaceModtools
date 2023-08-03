@@ -12,6 +12,7 @@ using Avalonia.Threading;
 using DynamicData;
 using LibGit2Sharp;
 using Timer =  System.Timers.Timer;
+using Avalonia.Styling;
 
 namespace RplaceModtools.ViewModels;
 public partial class MainWindowViewModel : ObservableObject
@@ -23,6 +24,8 @@ public partial class MainWindowViewModel : ObservableObject
     public TaskCompletionSource<byte[]> BoardFetchSource = new();
     private LiveChatViewModel liveChatVm = App.Current.Services.GetRequiredService<LiveChatViewModel>();
     private PaletteViewModel paletteVm = App.Current.Services.GetRequiredService<PaletteViewModel>();
+
+    [ObservableProperty] private ThemeVariant currentTheme = ThemeVariant.Light;
 
     [ObservableProperty] private byte[]? board;
     [ObservableProperty] private byte[]? changes;
@@ -461,6 +464,12 @@ public partial class MainWindowViewModel : ObservableObject
         }
 
         return false;
+    }
+
+    [RelayCommand]
+    private void ToggleTheme()
+    {
+        CurrentTheme = CurrentTheme == ThemeVariant.Light ? ThemeVariant.Dark : ThemeVariant.Light; 
     }
 
     [RelayCommand]
