@@ -5,6 +5,6 @@ public enum Tool
     PaintBrush,
     Rubber,
     Select,
-    Macro,
+    Fill,
     None
 }

@@ -64,6 +64,11 @@ public partial class MainWindow : Window
         InitializeComponent();
 
         viewModel.BoardSetPixel = pixel => Board.Set(pixel);
+        viewModel.StartSelection = (tl, br) => Board.StartSelection(tl, br);
+        viewModel.UpdateSelection = (selection, tl, br) => Board.UpdateSelection(selection, tl, br);
+        viewModel.RemoveSelection = selection => Board.RemoveSelection(selection);
+        viewModel.ClearSelections = () => Board.ClearSelections();
+
         PaletteListBox.DataContext = App.Current.Services.GetRequiredService<PaletteViewModel>();
         LiveChatGridContainer.DataContext = App.Current.Services.GetRequiredService<LiveChatViewModel>();
         
@@ -90,35 +95,6 @@ public partial class MainWindow : Window
         });
     }
     
-    private void RollbackArea(int x, int y, int regionWidth, int regionHeight, byte[] rollbackBoard)
-    {
-        // TODO: Improve range checks here (even though server will likely fix regardless)
-        if (regionWidth > 250 || regionHeight > 250 || x >= viewModel.CanvasWidth || y >= viewModel.CanvasHeight)
-        {
-            return;
-        }
-        
-        var buffer = new byte[6 + regionWidth * regionHeight];
-        var i = (int) (x + y * viewModel.CanvasWidth);
-        
-        // Setting up first 7 bytes of metadata
-        new byte[]
-        {
-            99, (byte) regionWidth, (byte) (i >> 24), (byte) (i >> 16), (byte) (i >> 8), (byte) i
-        }.CopyTo(buffer, 0);
-        
-        // Copy over just that region of the board into the buffer we send to server
-        for (var row = 0; row < regionHeight; row++)
-        {
-            Buffer.BlockCopy(rollbackBoard, i, buffer, 6 + row * regionWidth, regionWidth);
-            i += (int) viewModel.CanvasWidth;
-        }
-
-        if (viewModel.Socket is { IsRunning: true })
-        {
-            viewModel.Socket.Send(buffer);
-        }
-    }
     
     private async Task<Bitmap?> CreateCanvasPreviewImage<T>(T input)
     {
@@ -187,7 +163,7 @@ public partial class MainWindow : Window
         }
         
         var mousePosition = MouseOverPixel(e);
-        foreach (var selection in Board.Selections)
+        foreach (var selection in viewModel.Selections)
         {
             if (selection.TopLeft.X < mousePosition.X && selection.TopLeft.Y < mousePosition.Y &&
                 selection.BottomRight.X > mousePosition.X && selection.BottomRight.Y > mousePosition.Y)
@@ -198,7 +174,7 @@ public partial class MainWindow : Window
                 }
                 else
                 {
-                    Board.CurrentSelection = selection;
+                    viewModel.CurrentSelection = selection;
                 }
                     
                 return;
@@ -209,42 +185,42 @@ public partial class MainWindow : Window
         {
             // Try find if we are near any of the current selection's handles,
             // if so we current that handle, otherwise, we will create a new selection
-            if (Board.CurrentSelection is not null
-                && Board.CurrentSelection.TopLeft.X - 8 < mousePosition.X && Board.CurrentSelection.TopLeft.Y - 8 < mousePosition.Y
-                && Board.CurrentSelection.BottomRight.X + 8 > mousePosition.X && Board.CurrentSelection.BottomRight.Y + 8 > mousePosition.Y)
+            if (viewModel.CurrentSelection is not null
+                && viewModel.CurrentSelection.TopLeft.X - 8 < mousePosition.X && Board.CurrentSelection.TopLeft.Y - 8 < mousePosition.Y
+                && viewModel.CurrentSelection.BottomRight.X + 8 > mousePosition.X && Board.CurrentSelection.BottomRight.Y + 8 > mousePosition.Y)
             {
-                if (Math.Abs(Board.CurrentSelection.TopLeft.X - mousePosition.X) < 4)
+                if (Math.Abs(viewModel.CurrentSelection.TopLeft.X - mousePosition.X) < 4)
                 {
-                    if (Math.Abs(Board.CurrentSelection.TopLeft.Y - mousePosition.Y) < 4) // Tl handle
+                    if (Math.Abs(viewModel.CurrentSelection.TopLeft.Y - mousePosition.Y) < 4) // Tl handle
                     {
-                        Board.CurrentHandle = SelectionHandle.TopLeft;
+                        viewModel.CurrentHandle = SelectionHandle.TopLeft;
                     }
-                    else if (Math.Abs(Board.CurrentSelection.BottomRight.Y - mousePosition.Y) < 4) // Bl handle
+                    else if (Math.Abs(viewModel.CurrentSelection.BottomRight.Y - mousePosition.Y) < 4) // Bl handle
                     {
-                        Board.CurrentHandle = SelectionHandle.BottomLeft;
+                        viewModel.CurrentHandle = SelectionHandle.BottomLeft;
                     }
                 }
-                else if (Math.Abs(Board.CurrentSelection.BottomRight.X - mousePosition.X) < 4)
+                else if (Math.Abs(viewModel.CurrentSelection.BottomRight.X - mousePosition.X) < 4)
                 {
-                    if (Math.Abs(Board.CurrentSelection.BottomRight.Y - mousePosition.Y) < 4) // Br handle
+                    if (Math.Abs(viewModel.CurrentSelection.BottomRight.Y - mousePosition.Y) < 4) // Br handle
                     {
-                        Board.CurrentHandle = SelectionHandle.BottomRight;
+                        viewModel.CurrentHandle = SelectionHandle.BottomRight;
                     }
-                    else if (Math.Abs(Board.CurrentSelection.TopLeft.Y - mousePosition.Y) < 4) // Tr handle
+                    else if (Math.Abs(viewModel.CurrentSelection.TopLeft.Y - mousePosition.Y) < 4) // Tr handle
                     {
-                        Board.CurrentHandle = SelectionHandle.TopRight;
+                        viewModel.CurrentHandle = SelectionHandle.TopRight;
                     }
                 }
                 else
                 {
-                    Board.CurrentHandle = SelectionHandle.None;
+                    viewModel.CurrentHandle = SelectionHandle.None;
                 }
             }
             else
             {
                 var newSelection = Board.StartSelection(mousePosition, new Point(mousePosition.X + 4, mousePosition.Y + 4));
-                Board.CurrentSelection = newSelection;
-                Board.CurrentHandle = SelectionHandle.BottomRight;
+                viewModel.CurrentSelection = newSelection;
+                viewModel.CurrentHandle = SelectionHandle.BottomRight;
             }
         }
     }
@@ -302,36 +278,36 @@ public partial class MainWindow : Window
                     new Color(pixelColour.Alpha, pixelColour.Red, pixelColour.Green, pixelColour.Blue));
                 return;
             }
-            if (viewModel.CurrentTool == Tool.Select && Board.CurrentSelection is not null)
+            if (viewModel.CurrentTool == Tool.Select && viewModel.CurrentSelection is not null)
             {
                 var mousePosition = MouseOverPixel(e);
-                if (Board.CurrentHandle == SelectionHandle.None)
+                if (viewModel.CurrentHandle == SelectionHandle.None)
                 {
                     return;
                 }
 
-                var topLeft = Board.CurrentHandle switch
+                var topLeft = viewModel.CurrentHandle switch
                 {
-                    SelectionHandle.TopLeft => new Point(Math.Min(mousePosition.X, Board.CurrentSelection.BottomRight.X - 4),
-                            Math.Min(mousePosition.Y, Board.CurrentSelection.BottomRight.Y - 4)),
-                    SelectionHandle.BottomLeft => new Point(Math.Min(mousePosition.X, Board.CurrentSelection.BottomRight.X - 4),
-                            Board.CurrentSelection.TopLeft.Y),
-                    SelectionHandle.TopRight => new Point(Board.CurrentSelection.TopLeft.X,
-                            Math.Min(mousePosition.Y, Board.CurrentSelection.BottomRight.Y - 4)),
-                    _ => Board.CurrentSelection.TopLeft
+                    SelectionHandle.TopLeft => new Point(Math.Min(mousePosition.X, viewModel.CurrentSelection.BottomRight.X - 4),
+                            Math.Min(mousePosition.Y, viewModel.CurrentSelection.BottomRight.Y - 4)),
+                    SelectionHandle.BottomLeft => new Point(Math.Min(mousePosition.X, viewModel.CurrentSelection.BottomRight.X - 4),
+                        viewModel.CurrentSelection.TopLeft.Y),
+                    SelectionHandle.TopRight => new Point(viewModel.CurrentSelection.TopLeft.X,
+                            Math.Min(mousePosition.Y, viewModel.CurrentSelection.BottomRight.Y - 4)),
+                    _ => viewModel.CurrentSelection.TopLeft
                 };
                 var bottomRight = Board.CurrentHandle switch
                 {
-                    SelectionHandle.BottomLeft => new Point(Board.CurrentSelection.BottomRight.X,
-                            Math.Max(mousePosition.Y, Board.CurrentSelection.TopLeft.Y + 4)),
-                    SelectionHandle.BottomRight => new Point(Math.Max(mousePosition.X, Board.CurrentSelection.TopLeft.X + 4),
-                            Math.Max(mousePosition.Y, Board.CurrentSelection.TopLeft.Y + 4)),
-                    SelectionHandle.TopRight => new Point(Math.Max(mousePosition.X, Board.CurrentSelection.TopLeft.X + 4),
-                            Board.CurrentSelection.BottomRight.Y),
-                    _ => Board.CurrentSelection.BottomRight
+                    SelectionHandle.BottomLeft => new Point(viewModel.CurrentSelection.BottomRight.X,
+                            Math.Max(mousePosition.Y, viewModel.CurrentSelection.TopLeft.Y + 4)),
+                    SelectionHandle.BottomRight => new Point(Math.Max(mousePosition.X, viewModel.CurrentSelection.TopLeft.X + 4),
+                            Math.Max(mousePosition.Y, viewModel.CurrentSelection.TopLeft.Y + 4)),
+                    SelectionHandle.TopRight => new Point(Math.Max(mousePosition.X, viewModel.CurrentSelection.TopLeft.X + 4), 
+                            viewModel.CurrentSelection.BottomRight.Y),
+                    _ => viewModel.CurrentSelection.BottomRight
                 };
 
-                Board.UpdateSelection(Board.CurrentSelection, topLeft, bottomRight);
+                Board.UpdateSelection(viewModel.CurrentSelection, topLeft, bottomRight);
                 return;
             }
             if (paletteVm.CurrentColour is not null) //drag place pixels
@@ -371,7 +347,7 @@ public partial class MainWindow : Window
 
         if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
         {
-            Board.CurrentHandle = SelectionHandle.None;
+            viewModel.CurrentHandle = SelectionHandle.None;
         }
         
         //click place pixel
@@ -544,20 +520,6 @@ public partial class MainWindow : Window
         };
         
         process.Start();
-    }
-
-    private void OnRollbackButtonClicked(object? sender, RoutedEventArgs e)
-    {
-        if (Board.SelectionBoard is null)
-        {
-            return;
-        }
-
-        foreach (var selection in Board.Selections)
-        {
-            RollbackArea((int) selection.TopLeft.X, (int) selection.TopLeft.Y, (int) selection.BottomRight.X - (int) selection.TopLeft.X, 
-                (int) selection.BottomRight.Y - (int) selection.TopLeft.Y, Board.SelectionBoard);
-        }        
     }
     
     private void OnPresetsAdvancedClicked(object? sender, RoutedEventArgs e)

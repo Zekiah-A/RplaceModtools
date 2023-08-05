@@ -8,6 +8,7 @@ using RplaceModtools.Models;
 using Websocket.Client;
 using System.Text;
 using System.Text.RegularExpressions;
+using Avalonia;
 using Avalonia.Threading;
 using DynamicData;
 using LibGit2Sharp;
@@ -24,16 +25,27 @@ public partial class MainWindowViewModel : ObservableObject
     public TaskCompletionSource<byte[]> BoardFetchSource = new();
     private LiveChatViewModel liveChatVm = App.Current.Services.GetRequiredService<LiveChatViewModel>();
     private PaletteViewModel paletteVm = App.Current.Services.GetRequiredService<PaletteViewModel>();
-
+    
+    // TODO: Hack for now - later update to much better ObservableCollection to try and manage
+    public Action<Point, Point> StartSelection;
+    public Action<Selection, Point?, Point?> UpdateSelection;
+    public Action<Selection> RemoveSelection;
+    public Action ClearSelections;
+    
     [ObservableProperty] private ThemeVariant currentTheme = ThemeVariant.Light;
 
     [ObservableProperty] private byte[]? board;
     [ObservableProperty] private byte[]? changes;
     [ObservableProperty] private uint canvasWidth;
     [ObservableProperty] private uint canvasHeight;
+    
     [ObservableProperty] private byte[]? selectionBoard;
-
     [ObservableProperty] private bool viewSelectedBackupArea;
+    [ObservableProperty] private Selection? currentSelection;
+    // TODO: Please never use direct operations on this (we want it essentially readonly) until the actions are patched
+    [ObservableProperty] private List<Selection> selections = new();
+    [ObservableProperty] private SelectionHandle currentHandle = SelectionHandle.None;
+    
     [ObservableProperty] private string? currentBackup;
     [ObservableProperty] private ObservableCollection<string> backups = new()
     {
@@ -487,6 +499,7 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void SelectPaintTool()
     {
+        RemoveToolStateInfos();
         AddStateInfo(App.Current.Services.GetRequiredService<PaintBrushStateInfoViewModel>());
         CurrentTool = Tool.PaintBrush;
     }
@@ -494,15 +507,21 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void SelectRubberTool()
     {
-        //StateInfo.Remove();
         CurrentTool = Tool.Rubber;
     }
 
     [RelayCommand]
     private void SelectSelectionTool()
     {
-        //StateInfo.Remove();
+        RemoveToolStateInfos();
+        AddStateInfo(App.Current.Services.GetRequiredService<SelectStateInfoViewModel>());
         CurrentTool = Tool.Select;
+    }
+
+    private void RemoveToolStateInfos()
+    {
+        RemoveStateInfo(App.Current.Services.GetRequiredService<PaintBrushStateInfoViewModel>());
+        RemoveStateInfo(App.Current.Services.GetRequiredService<SelectStateInfoViewModel>());
     }
 
     [RelayCommand]
@@ -515,6 +534,53 @@ public partial class MainWindowViewModel : ObservableObject
         else
         {
             Task.Run(() => ViewCanvasAtBackup(CurrentBackup));
+        }
+    }
+
+    [RelayCommand]
+    private void RollbackSelectedArea()
+    {
+        if (SelectionBoard is null)
+        {
+            Console.WriteLine("ERROR: Currently you need to enable 'view selected area at canvas backup' in order to rollback.");
+            return;
+        }
+
+        foreach (var selection in Selections)
+        {
+            Rollback((int) selection.TopLeft.X, (int) selection.TopLeft.Y, (int) selection.BottomRight.X - (int) selection.TopLeft.X, 
+                (int) selection.BottomRight.Y - (int) selection.TopLeft.Y, SelectionBoard);
+        }        
+
+    }
+    
+    private void Rollback(int x, int y, int regionWidth, int regionHeight, byte[] rollbackBoard)
+    {
+        // TODO: Improve range checks here (even though server will likely fix regardless)
+        if (regionWidth > 250 || regionHeight > 250 || x >= CanvasWidth || y >= CanvasHeight)
+        {
+            return;
+        }
+        
+        var buffer = new byte[6 + regionWidth * regionHeight];
+        var i = (int) (x + y * CanvasWidth);
+        
+        // Setting up first 7 bytes of metadata
+        new byte[]
+        {
+            99, (byte) regionWidth, (byte) (i >> 24), (byte) (i >> 16), (byte) (i >> 8), (byte) i
+        }.CopyTo(buffer, 0);
+        
+        // Copy over just that region of the board into the buffer we send to server
+        for (var row = 0; row < regionHeight; row++)
+        {
+            Buffer.BlockCopy(rollbackBoard, i, buffer, 6 + row * regionWidth, regionWidth);
+            i += (int) CanvasWidth;
+        }
+
+        if (Socket is { IsRunning: true })
+        {
+            Socket.Send(buffer);
         }
     }
 
@@ -615,6 +681,14 @@ public partial class MainWindowViewModel : ObservableObject
             }
 
             StateInfos.Add(stateInfo);
+        }
+    }
+
+    private void RemoveStateInfo(ObservableObject stateInfo)
+    {
+        lock (stateInfosLock)
+        {
+            StateInfos.Remove(stateInfo);
         }
     }
 

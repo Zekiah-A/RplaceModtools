@@ -1,7 +1,5 @@
-using System.Collections.Concurrent;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Rendering.SceneGraph;
@@ -16,8 +14,8 @@ namespace RplaceModtools.Views;
 public partial class SkCanvas : UserControl
 {
     protected object selectionsLock = new();
-    public List<Selection> Selections = new();
-    public SelectionHandle CurrentHandle = SelectionHandle.None;
+    protected List<Selection> selections = new();
+    protected SelectionHandle currentHandle = SelectionHandle.None;
 
     protected uint canvasWidth = 500;
     protected uint canvasHeight = 500;
@@ -59,6 +57,22 @@ public partial class SkCanvas : UserControl
             instance => instance.SelectionBoard,
             (instance, value) => instance.SelectionBoard = value);
     
+    public static readonly DirectProperty<SkCanvas, Selection?> CurrentSelectionProperty =
+        AvaloniaProperty.RegisterDirect<SkCanvas, Selection?>(nameof(SelectionBoard),
+            instance => instance.currentSelection,
+            (instance, value) => instance.currentSelection = value);
+
+    public static readonly DirectProperty<SkCanvas, List<Selection>> SelectionsProperty =
+        AvaloniaProperty.RegisterDirect<SkCanvas, List<Selection>>(nameof(SelectionBoard),
+            instance => instance.selections,
+            (instance, value) => instance.selections = value);
+
+    public static readonly DirectProperty<SkCanvas, SelectionHandle> CurrentHandleProperty =
+        AvaloniaProperty.RegisterDirect<SkCanvas, SelectionHandle>(nameof(SelectionBoard),
+            instance => instance.currentHandle,
+            (instance, value) => instance.currentHandle = value);
+
+
     // Binding redraw triggering control properties 
     public byte[]? Board
     {
@@ -105,6 +119,28 @@ public partial class SkCanvas : UserControl
         set => SetAndRaise(CanvasHeightProperty, ref canvasHeight, value);
     }
     
+    public Selection? CurrentSelection
+    {
+        get => currentSelection;
+        set
+        {
+            SetAndRaise(CurrentSelectionProperty, ref currentSelection, value);
+            Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
+        }
+    }
+
+    public List<Selection> Selections
+    {
+        get => selections;
+        set => SetAndRaise(SelectionsProperty, ref selections, value);
+    }
+
+    public SelectionHandle CurrentHandle
+    {
+        get => currentHandle;
+        set => SetAndRaise(CurrentHandleProperty, ref currentHandle, value);
+    }
+
     // Non-binding redraw triggering control properties 
     public byte[]? SocketPixels
     {
@@ -143,17 +179,6 @@ public partial class SkCanvas : UserControl
             Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
         }
     }
-
-    public Selection? CurrentSelection
-    {
-        get => currentSelection;
-        set
-        {
-            currentSelection = value;
-            Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
-        }
-    }
-
 
     public SkCanvas()
     {
@@ -356,7 +381,6 @@ public partial class SkCanvas : UserControl
     
     public Selection StartSelection(Point topLeft, Point bottomRight)
     {
-
         var sel = new Selection
         {
             TopLeft = topLeft,
@@ -426,10 +450,4 @@ public partial class SkCanvas : UserControl
         socketPixels[x + y * CanvasWidth] = 255;
         Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
     }
-}
-
-public class Selection
-{
-    public Point TopLeft;
-    public Point BottomRight;
 }

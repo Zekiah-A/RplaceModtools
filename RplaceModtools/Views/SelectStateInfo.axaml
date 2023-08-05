@@ -5,15 +5,26 @@
              xmlns:viewModels="clr-namespace:RplaceModtools.ViewModels"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="RplaceModtools.Views.SelectStateInfo">
-    <Design.DataContext>
-        <viewModels:SelectStateInfoViewModel/>
-    </Design.DataContext>
     <UserControl.DataContext>
         <viewModels:SelectStateInfoViewModel/>
     </UserControl.DataContext>
     
     <StackPanel>
-        <Button>Clear all selections</Button>
-        <Button>Cycle primary selection</Button>
+        <TextBlock Foreground="White" FontSize="18">General:</TextBlock>
+        <StackPanel Orientation="Horizontal" Spacing="4" Margin="0 0 0 8">
+            <Button Command="{Binding ClearSelectionsCommand}">Clear all selections</Button>
+            <Button Command="{Binding CyclePrimaryCommand}">Cycle primary selection</Button>
+        </StackPanel>
+        <TextBlock Foreground="White" FontSize="18">Instance:</TextBlock>
+        <StackPanel Margin="8" Spacing="4">
+            <NumericUpDown Value="{Binding InstanceX}" Watermark="X" Minimum="0"></NumericUpDown>
+            <NumericUpDown Value="{Binding InstanceY}" Watermark="Y" Minimum="0"></NumericUpDown>
+            <NumericUpDown Value="{Binding InstanceWidth}" Watermark="Width" Maximum="256" Minimum="0"></NumericUpDown>
+            <NumericUpDown Value="{Binding InstanceHeight}" Watermark="Height" Maximum="256" Minimum="0"></NumericUpDown>
+            <StackPanel Orientation="Horizontal">
+                <Button Command="{Binding CreateNewCommand}">Create new</Button>
+                <Button Command="{Binding MoveCurrentToCommand}">Move current to here</Button>
+            </StackPanel>
+        </StackPanel>
     </StackPanel>
 </UserControl>
