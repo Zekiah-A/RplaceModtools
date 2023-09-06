@@ -13,24 +13,24 @@ namespace RplaceModtools.Views;
 
 public partial class SkCanvas : UserControl
 {
-    protected object selectionsLock = new();
-    protected List<Selection> selections = new();
-    protected SelectionHandle currentHandle = SelectionHandle.None;
+    private object selectionsLock = new();
+    private List<Selection> selections = new();
+    private SelectionHandle currentHandle = SelectionHandle.None;
 
-    protected uint canvasWidth = 500;
-    protected uint canvasHeight = 500;
-    protected byte[]? board = null;
-    protected byte[]? changes = null;
-    protected byte[]? selectionBoard = null;
-    protected SKImage? boardCache;
-    protected SKImage? changesCache;
-    protected SKImage? selectionCanvasCache;
-    protected byte[]? socketPixels;
+    private uint canvasWidth = 500;
+    private uint canvasHeight = 500;
+    private byte[]? board = null;
+    private byte[]? changes = null;
+    private byte[]? selectionBoard = null;
+    private SKImage? boardCache;
+    private SKImage? changesCache;
+    private SKImage? selectionCanvasCache;
+    private byte[]? socketPixels;
 
-    protected Selection? currentSelection;
-    protected float canvZoom = 1;
-    protected SKPoint canvPosition = SKPoint.Empty;
-    protected List<SKPaint> paints = new();
+    private Selection? currentSelection;
+    private float canvZoom = 1;
+    private SKPoint canvPosition = SKPoint.Empty;
+    private List<SKPaint> paints = new();
     
     public static readonly DirectProperty<SkCanvas, byte[]?> BoardProperty =
         AvaloniaProperty.RegisterDirect<SkCanvas, byte[]?>(nameof(Board),
@@ -193,8 +193,7 @@ public partial class SkCanvas : UserControl
 
     private class CustomDrawOp : ICustomDrawOperation
     {
-        private SkCanvas parent { get; }
-
+        private readonly SkCanvas parent;
         public Rect Bounds { get; }
 
         public CustomDrawOp(Rect bounds, SkCanvas parentSk)

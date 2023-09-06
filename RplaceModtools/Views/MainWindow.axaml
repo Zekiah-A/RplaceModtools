@@ -131,7 +131,7 @@
             <Grid RowDefinitions="*, Auto">
                 <StackPanel Grid.Row="0">
                     <Image Classes="PlaceLogo" Source="../Assets/favicon.png"/>
-                    <Label Classes="PlaceTitle">RplaceTK Mod Tools</Label>
+                    <Label Classes="PlaceTitle">Rplace.Live Mod Tools</Label>
                     <StackPanel Classes="PlaceConfig" Margin="10">
                         <TextBlock FontSize="24" Margin="0 0 0 5">Configuration:</TextBlock>
                         <AutoCompleteBox Watermark="Canvas websocket address" ItemsSource="{Binding KnownWebsockets}" Text="{Binding CurrentPreset.Websocket}" Margin="0 0 0 5"/>
@@ -332,35 +332,46 @@
             </Canvas>
             
             <!--Change this border into just the listbox, put the border around each element-->
-            <ListBox Classes="StateInfo" ItemsSource="{Binding StateInfos}"
-                     SelectedItem="{Binding SelectedStateInfo}" VerticalAlignment="Top"
-                     HorizontalAlignment="Right" Margin="16">
-                <ListBox.Styles>
-                    <Style Selector="ListBoxItem">
-                        <Setter Property="Border.CornerRadius" Value="8"/>
-                        <Setter Property="Margin" Value="4"/>
-                        <Setter Property="Background">
-                            <Setter.Value>
-                                <SolidColorBrush Color="Gray" Opacity="0.5" />
-                            </Setter.Value>
-                        </Setter>
-                    </Style>
-                    <Style Selector="ListBoxItem:selected">
-                        <Setter Property="Border.CornerRadius" Value="8"/>
-                        <Setter Property="Margin" Value="4"/>
-                    </Style>
-                    <Style Selector="ListBoxItem:pointerover">
-                        <Setter Property="Border.CornerRadius" Value="8"/>
-                        <Setter Property="Margin" Value="4"/>
-                        <Setter Property="Background">
-                            <Setter.Value>
-                                <SolidColorBrush Color="Gray" Opacity="0.8" />
-                            </Setter.Value>
-                        </Setter>
-                    </Style>
-                </ListBox.Styles>
-            </ListBox>
-            
+                <ListBox Classes="StateInfo" ItemsSource="{Binding StateInfos}"
+                         SelectedItem="{Binding SelectedStateInfo}" VerticalAlignment="Top"
+                         HorizontalAlignment="Right" Margin="16" ClipToBounds="True">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <views:SkBlurBehind>
+                                <ContentPresenter Padding="4" Content="{Binding }">
+                                </ContentPresenter>
+                            </views:SkBlurBehind>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+
+                    <ListBox.Styles>
+                        <Style Selector="ListBoxItem">
+                            <Setter Property="Border.CornerRadius" Value="8"/>
+                            <Setter Property="Margin" Value="4"/>
+                            <Setter Property="Padding" Value="1" />
+                            <Setter Property="Background">
+                                <Setter.Value>
+                                    <SolidColorBrush Color="Gray" Opacity="0.4" />
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                        <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+                            <Setter Property="Background">
+                                <Setter.Value>
+                                    <SolidColorBrush Color="Gray" Opacity="0.6" />
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                        <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+                            <Setter Property="Background">
+                                <Setter.Value>
+                                    <SolidColorBrush Color="Gray" Opacity="0.6" />
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.Styles>
+                </ListBox>
+
             <Button ZIndex="3" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="10" Padding="10" Click="OnSelectColourClicked">Select Colour</Button>
             <DockPanel ZIndex="8" Dock="Bottom" Height="150" VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Background="White" IsVisible="False" x:Name="Palette">
                 <Grid RowDefinitions="* Auto">
