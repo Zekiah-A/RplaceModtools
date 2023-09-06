@@ -15,14 +15,26 @@
             <Button Command="{Binding ClearSelectionsCommand}">Clear all selections</Button>
             <Button Command="{Binding CyclePrimaryCommand}">Cycle primary selection</Button>
         </StackPanel>
-        <TextBlock Foreground="White" FontSize="18">Instance:</TextBlock>
+        <TextBlock Foreground="White" FontSize="18">Manage selection:</TextBlock>
         <StackPanel Margin="8" Spacing="4">
-            <NumericUpDown Value="{Binding InstanceX}" Watermark="X" Minimum="0"></NumericUpDown>
-            <NumericUpDown Value="{Binding InstanceY}" Watermark="Y" Minimum="0"></NumericUpDown>
-            <NumericUpDown Value="{Binding InstanceWidth}" Watermark="Width" Maximum="256" Minimum="0"></NumericUpDown>
-            <NumericUpDown Value="{Binding InstanceHeight}" Watermark="Height" Maximum="256" Minimum="0"></NumericUpDown>
+            <Grid ColumnDefinitions="64 *">
+                <TextBlock Grid.Column="0">X:</TextBlock>
+                <NumericUpDown Grid.Column="1" Value="{Binding InstanceX}" Watermark="X" Minimum="0"></NumericUpDown>
+            </Grid>
+            <Grid ColumnDefinitions="64 *">
+                <TextBlock Grid.Column="0">Y:</TextBlock>
+                <NumericUpDown Grid.Column="1" Value="{Binding InstanceY}" Watermark="Y" Minimum="0"></NumericUpDown>
+            </Grid>
+            <Grid ColumnDefinitions="64 *">
+                <TextBlock Grid.Column="0">Width:</TextBlock>
+                <NumericUpDown Grid.Column="1" Value="{Binding InstanceWidth}" Watermark="Width" Maximum="256" Minimum="0"></NumericUpDown>
+            </Grid>
+            <Grid ColumnDefinitions="64 *">
+                <TextBlock Grid.Column="0">Height:</TextBlock>
+                <NumericUpDown Grid.Column="1" Value="{Binding InstanceHeight}" Watermark="Height" Maximum="256" Minimum="0"></NumericUpDown>
+            </Grid>
             <StackPanel Orientation="Horizontal">
-                <Button Command="{Binding CreateNewCommand}">Create new</Button>
+                <Button Command="{Binding CreateNewCommand}">Create new here</Button>
                 <Button Command="{Binding MoveCurrentToCommand}">Move current to here</Button>
             </StackPanel>
         </StackPanel>

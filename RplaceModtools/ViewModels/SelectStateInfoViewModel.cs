@@ -34,7 +34,7 @@ public partial class SelectStateInfoViewModel : ObservableObject
         }
         
         var newIndex = mainWindowVm.CurrentSelection == null ? 0
-            : mainWindowVm.Selections.IndexOf(mainWindowVm.CurrentSelection);
+            : mainWindowVm.Selections.IndexOf(mainWindowVm.CurrentSelection) + 1;
 
         if (newIndex > mainWindowVm.Selections.Count - 1)
         {

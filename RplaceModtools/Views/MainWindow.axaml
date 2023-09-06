@@ -337,7 +337,7 @@
                          HorizontalAlignment="Right" Margin="16" ClipToBounds="True">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <views:SkBlurBehind>
+                            <views:SkBlurBehind BlurRadius="10">
                                 <ContentPresenter Padding="4" Content="{Binding }">
                                 </ContentPresenter>
                             </views:SkBlurBehind>
