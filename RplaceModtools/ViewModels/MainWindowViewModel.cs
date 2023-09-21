@@ -9,11 +9,16 @@ using Websocket.Client;
 using System.Text;
 using System.Text.RegularExpressions;
 using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using DynamicData;
 using LibGit2Sharp;
 using Timer =  System.Timers.Timer;
 using Avalonia.Styling;
+using RplaceModtools.Views;
+using SkiaSharp;
 
 namespace RplaceModtools.ViewModels;
 public partial class MainWindowViewModel : ObservableObject
@@ -66,6 +71,7 @@ public partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty] private ObservableCollection<ObservableObject> stateInfos = new();
     [ObservableProperty] public ObservableObject selectedStateInfo;
+    [ObservableProperty] private IImage? previewImageSource = new Bitmap("avares://../Assets/preview_default.png");
 
     // TODO: Stand-in boolean to control hiding the initial presets and other panels
     [ObservableProperty] private bool startedAndConfigured;
@@ -98,7 +104,7 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task Start()
+    private void Start()
     {
         //Configure the current session's data
         if (!ServerPresetExists(CurrentPreset))
@@ -106,26 +112,89 @@ public partial class MainWindowViewModel : ObservableObject
             SaveServerPreset(CurrentPreset);
         }
         
-        //UI and connections
+        //UI and connections, the second and third methods here mind-blowingly heavy and therefore run on separate threads
         _ = CreateConnection(UriCombine(CurrentPreset.Websocket, CurrentPreset.AdminKey));
         _ = Task.Run(async () =>
         {
+            var boardNotification = App.Current.Services.GetRequiredService<NotificationStateInfoViewModel>();
+            AddStateInfo(boardNotification);
+            boardNotification.PersistsFor = TimeSpan.MaxValue;
+            boardNotification.Notification = "Loading canvas";
+
             var boardPath = UriCombine(CurrentPreset.FileServer, CurrentPreset.MainBranch, CurrentPreset.PlacePath);
             var boardResponse = await Fetch(boardPath) ?? throw new Exception("Initial board load failed. Board response was null");
             BoardFetchSource.SetResult(await boardResponse.Content.ReadAsByteArrayAsync());
+            AddStateInfo(boardNotification);
+
             //PreviewImg.Source = await CreateCanvasPreviewImage(boardResponse);
         });
-        
+        _ = Task.Run(FetchCacheBackupList);
+
         StartedAndConfigured = true;
         CurrentBackup = Backups.First();
-        await FetchCacheBackupList();
+        
         BackupCheckInterval();
         StateInfoInterval();
     }
     
+    private async Task<Bitmap?> CreateCanvasPreviewImage<T>(T input)
+    {
+        async Task<byte[]?> FetchBoardAsync(Uri uri)
+        {
+            var boardResponse = await Fetch(uri);
+            if (boardResponse is not null)
+            {
+                return await boardResponse.Content.ReadAsByteArrayAsync();
+            }
+            
+            return null;
+        }
+        
+        var placeFile = input switch
+        {
+            Uri uri => await FetchBoardAsync(uri),
+            byte[] board => board,
+            _ => null
+        };
+        if (placeFile is null)
+        {
+            return null;
+        }
+        
+        var imageInfo = new SKImageInfo((int) CanvasWidth, (int) CanvasHeight, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using var surface = SKSurface.Create(imageInfo);
+        var canvas = surface.Canvas;
+
+        Parallel.For(0, placeFile.Length, i =>
+        {
+            var x = (int) (i % CanvasWidth);
+            var y = (int) (i / CanvasWidth);
+            canvas.DrawPoint(x, y, PaletteViewModel.Colours.ElementAtOrDefault(placeFile[i]));
+        });
+        
+        using var image = surface.Snapshot();
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+        if (data is null)
+        {
+            return null;
+        }
+        
+        var imageStream = data.AsStream();
+        imageStream.Seek(0, SeekOrigin.Begin);
+        var imageBitmap = new Bitmap(imageStream);
+        await imageStream.FlushAsync();
+        await imageStream.DisposeAsync();
+        return imageBitmap;
+    }
+
     private async Task FetchCacheBackupList()
     {
-        if (CurrentPreset!.LegacyServer)
+        var progressNotification = App.Current.Services.GetRequiredService<NotificationStateInfoViewModel>();
+        AddStateInfo(progressNotification);
+        progressNotification.PersistsFor = TimeSpan.MaxValue;
+        progressNotification.Notification = "Started loading canvas backup list: 0%.";
+
+        if (CurrentPreset.LegacyServer)
         {
             var nameMatches = RepositoryNameRegex().Match(CurrentPreset.BackupsRepository).Groups.Values.First();
             var invalidChars = new string(Path.GetInvalidFileNameChars());
@@ -141,7 +210,7 @@ public partial class MainWindowViewModel : ObservableObject
             }
             
             using var backupsRepository = new Repository(localPath);
-            var signature = new Signature("RplaceModtools", "rplacemodtools@unknown.com", DateTimeOffset.Now);
+            var signature = new Signature("RplaceModtools", "modtools@rplace.live", DateTimeOffset.Now);
             var mergeResult = Commands.Pull(backupsRepository, signature, new PullOptions());
 
             if (mergeResult.Status == MergeStatus.Conflicts)
@@ -242,7 +311,12 @@ public partial class MainWindowViewModel : ObservableObject
 
             File.Move(presetPath, oldPresetsPath);
             presets.Add(new ServerPreset());
-            AddStateInfo(App.Current.Services.GetRequiredService<OutdatedPresetsStateInfoViewModel>());
+            var outdatedPresets = App.Current.Services.GetRequiredService<NotificationStateInfoViewModel>();
+            AddStateInfo(outdatedPresets);
+            outdatedPresets.PersistsFor = TimeSpan.FromSeconds(15);
+            outdatedPresets.Notification =
+                $"⚠ Warning: Outdated server presets found. New presets file has been generated, and old presets moved to: '{oldPresetsPath}'";
+
             return presets;
         }
         
@@ -282,19 +356,14 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 Options = { KeepAliveInterval = TimeSpan.FromSeconds(5) }
             };
-            wsClient.Options.SetRequestHeader("Origin", "https://rplace.tk");
+            wsClient.Options.SetRequestHeader("Origin", "https://rplace.live");
             return wsClient;
         });
         Socket = new WebsocketClient(uri, factory)
         {
             ReconnectTimeout = TimeSpan.FromSeconds(10)
         };
-
-        Socket.ReconnectionHappened.Subscribe(info =>
-        {
-            Console.WriteLine("Reconnected to {0}, {1}", uri, info.Type);
-        });
-
+        
         Socket.MessageReceived.Subscribe(msg =>
         {
             var code = msg.Binary[0];
@@ -306,8 +375,13 @@ public partial class MainWindowViewModel : ObservableObject
                     var cooldown = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan()[5..]);
                     if (cooldown == 0xFFFFFFFF)
                     {
+                        Console.ForegroundColor = ConsoleColor.DarkYellow;
                         Console.WriteLine("Canvas is locked (readonly). Edits can not be made.");
-                        AddStateInfo(App.Current.Services.GetRequiredService<LockedCanvasStateInfoViewModel>());
+                        Console.ResetColor();
+                        var lockedNotification = App.Current.Services.GetRequiredService<NotificationStateInfoViewModel>();
+                        AddStateInfo(lockedNotification);
+                        lockedNotification.PersistsFor = TimeSpan.MaxValue;
+                        lockedNotification.Notification = "⚠ Warning: Server has notified that this canvas is locked. Edits can not be made.";
                     }
 
                     // New server packs canvas width and height in code 1, making it 17, equivalent to packet 2
@@ -428,17 +502,6 @@ public partial class MainWindowViewModel : ObservableObject
         
         return changes;
     }
-
-    partial void OnSelectedStateInfoChanged(ObservableObject? oldValue, ObservableObject? newValue)
-    {
-        lock (stateInfosLock)
-        {
-            if (newValue is not null)
-            {
-                StateInfos.Remove(newValue);
-            }
-        }
-    }
     
     public static void SaveServerPreset(ServerPreset preset)
     {
@@ -535,6 +598,37 @@ public partial class MainWindowViewModel : ObservableObject
         {
             Task.Run(() => ViewCanvasAtBackup(CurrentBackup));
         }
+    }
+
+    [RelayCommand]
+    private async Task DownloadCanvasPreview()
+    {
+        if (CurrentBackup is null)
+        {
+            // TODO: Make a notification state info to say what happened
+            return;
+        }
+        var savePath = await ShowSaveFileDialog(CurrentBackup + "_preview.png", "Download place preview image to filesystem");
+        if (savePath is null)
+        {
+            return;
+        }
+        var backupPath = UriCombine(CurrentPreset.FileServer, CurrentPreset.BackupsPath, CurrentBackup);
+        var placeImg = await CreateCanvasPreviewImage(backupPath);
+        placeImg?.Save(savePath);
+    }
+    
+    // TODO: This is bad practice. Find a better way later
+    private async Task<string?> ShowSaveFileDialog(string fileName, string title)
+    {
+        var dialog = new SaveFileDialog
+        {
+            InitialFileName = fileName,
+            Title = title
+        };
+        
+        var mainWindowView = App.Current.Services.GetRequiredService<MainWindow>();
+        return await dialog.ShowAsync(mainWindowView);
     }
 
     [RelayCommand]

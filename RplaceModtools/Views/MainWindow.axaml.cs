@@ -95,58 +95,6 @@ public partial class MainWindow : Window
         });
     }
     
-    
-    private async Task<Bitmap?> CreateCanvasPreviewImage<T>(T input)
-    {
-        async Task<byte[]?> FetchBoardAsync(Uri uri)
-        {
-            var boardResponse = await viewModel.Fetch(uri);
-            if (boardResponse is not null)
-            {
-                return await boardResponse.Content.ReadAsByteArrayAsync();
-            }
-            
-            return null;
-        }
-        
-        var placeFile = input switch
-        {
-            Uri uri => await FetchBoardAsync(uri),
-            byte[] board => board,
-            _ => null
-        };
-        if (placeFile is null)
-        {
-            return null;
-        }
-        
-        // TODO: viewModel.CanvasWidth, (int)viewModel.CanvasHeight could be wrong, we need to ensure board is properly unpacked
-        var imageInfo = new SKImageInfo((int) viewModel.CanvasWidth, (int) viewModel.CanvasHeight, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var surface = SKSurface.Create(imageInfo);
-        var canvas = surface.Canvas;
-
-        Parallel.For(0, placeFile.Length, i =>
-        {
-            var x = (int) (i % viewModel.CanvasWidth);
-            var y = (int) (i / viewModel.CanvasWidth);
-            canvas.DrawPoint(x, y, PaletteViewModel.Colours.ElementAtOrDefault(placeFile[i]));
-        });
-        
-        using var image = surface.Snapshot();
-        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
-        if (data is null) // TODO: Figure out why when using bitmap we get null data
-        {
-            return null;
-        }
-        
-        var imageStream = data.AsStream();
-        imageStream.Seek(0, SeekOrigin.Begin);
-        var imageBitmap = new Bitmap(imageStream);
-        await imageStream.FlushAsync();
-        await imageStream.DisposeAsync();
-        return imageBitmap;
-    }
-    
     private void OnBackgroundMouseDown(object? sender, PointerPressedEventArgs e)
     {
         if (e.Source is null || !e.Source.Equals(CanvasBackground))
@@ -390,32 +338,6 @@ public partial class MainWindow : Window
     private void OnPaletteSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         paletteVm.CurrentColour = (byte) ((sender as ListBox)?.SelectedIndex ?? paletteVm.CurrentColour ?? 0);
-    }
-    
-    private async void OnDownloadPreviewPressed(object? sender, RoutedEventArgs e)
-    {
-        var savePath = await ShowSaveFileDialog(
-            (CanvasDropdown.SelectedItem as string ?? "place") + "_preview.png", "Download place preview image to filesystem");
-        if (savePath is null)
-        {
-            return;
-        }
-        
-        var backupPath = UriCombine(viewModel.CurrentPreset.FileServer, viewModel.CurrentPreset.BackupsPath,
-            CanvasDropdown.SelectedItem! as string ?? "place");
-        var placeImg = await CreateCanvasPreviewImage(backupPath);
-        placeImg?.Save(savePath);
-    } 
-
-    private async Task<string?> ShowSaveFileDialog(string fileName, string title)
-    {
-        var dialog = new SaveFileDialog
-        {
-            InitialFileName = fileName,
-            Title = title
-        };
-        
-        return await dialog.ShowAsync(this);
     }
     
     private void SetPixels(Pixel px, int radius)

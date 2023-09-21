@@ -4,15 +4,10 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:viewModels="clr-namespace:RplaceModtools.ViewModels"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
-             x:Class="RplaceModtools.Views.OutdatedPresetsStateInfo">
+             x:Class="RplaceModtools.Views.NotificationStateInfo">
     <Design.DataContext>
-        <viewModels:OutdatedPresetsStateInfoViewModel/>
+        <viewModels:NotificationStateInfoViewModel/>
     </Design.DataContext>
-    <UserControl.DataContext>
-        <viewModels:OutdatedPresetsStateInfoViewModel/>
-    </UserControl.DataContext>
-  
-    <TextBlock Foreground="Yellow"
-        Text="{Binding OldPresetsPath,
-                StringFormat='⚠️ Warning: Outdated server presets found. New presets file has been generated, and old presets moved to: \'{0}\''}"></TextBlock>
+    
+    <TextBlock Foreground="Yellow" Text="{Binding Notification}"></TextBlock>
 </UserControl>
