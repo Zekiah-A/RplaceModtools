@@ -231,7 +231,10 @@ public partial class SkCanvas : UserControl
                     var colourI = parent.Board[i];
                     if (colourI < PaletteViewModel.Colours.Length)
                     {
-                        img.SetPixel((int)(i % parent.CanvasWidth), (int)(i / parent.CanvasWidth), PaletteViewModel.Colours[colourI]);
+                        img.SetPixel(
+                            (int)(i % parent.CanvasWidth),
+                            (int)(i / parent.CanvasWidth),
+                            PaletteViewModel.Colours[colourI]);
                     }
                 }
 
@@ -239,15 +242,17 @@ public partial class SkCanvas : UserControl
             }
             if (parent.changesCache is null && parent.Changes is not null)
             {
-                using var img = new SKBitmap((int)parent.CanvasWidth, (int)parent.CanvasHeight);
-                for (var i = 0; i < Math.Min(parent.Changes.Length, parent.CanvasWidth * parent.CanvasHeight); i++)
+                var canvasWidth = (int) parent.CanvasWidth;
+                var canvasHeight = (int) parent.CanvasHeight;
+                using var img = new SKBitmap(canvasWidth, canvasHeight);
+                for (var i = 0; i < Math.Min(parent.Changes.Length, canvasWidth * canvasHeight); i++)
                 {
-                    if (parent.Changes[i] == 0)
+                    if (parent.Changes[i] == 0 || parent.Changes[i] > PaletteViewModel.Colours.Length - 1)
                     {
                         continue;
                     }
-                    
-                    img.SetPixel((int)(i % parent.CanvasWidth), (int)(i / parent.CanvasWidth), PaletteViewModel.Colours[parent.Changes[i]]);
+                    img.SetPixel((int)(i % parent.CanvasWidth), (int)(i / parent.CanvasWidth),
+                        PaletteViewModel.Colours[parent.Changes[i]]);
                 }
                 
                 parent.changesCache = SKImage.FromBitmap(img);

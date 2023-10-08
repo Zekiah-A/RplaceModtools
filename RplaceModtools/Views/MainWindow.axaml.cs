@@ -30,14 +30,15 @@ public partial class MainWindow : Window
     private MainWindowViewModel viewModel;
     private PaletteViewModel paletteVm = App.Current.Services.GetRequiredService<PaletteViewModel>();
     private LiveChatViewModel liveChatVm = App.Current.Services.GetRequiredService<LiveChatViewModel>();
+    private const int handleClickRadius = 8;
 
     private Point LookingAtPixel
     {
         get
         {
             lookingAtPixel = new Point(
-                Math.Clamp(Math.Floor(MainGrid.ColumnDefinitions[0].ActualWidth / 2 - Board.Left), 0, viewModel.CanvasWidth),
-                Math.Clamp(Math.Floor(Height / 2 - Board.Top), 0, viewModel.CanvasHeight)
+                Math.Clamp(Math.Floor(MainGrid.ColumnDefinitions[0].ActualWidth / 2 - (Board.Left * Board.Zoom)), 0, viewModel.CanvasWidth),
+                Math.Clamp(Math.Floor(Height / 2 - (Board.Top * Board.Zoom)), 0, viewModel.CanvasHeight)
             );
 
             return lookingAtPixel;
@@ -50,10 +51,26 @@ public partial class MainWindow : Window
         }
     }
 
-    private Point MouseOverPixel(PointerEventArgs e) => new(
-        (int) Math.Clamp(Math.Floor((e.GetPosition(CanvasBackground).X - Board.Left) * Board.Zoom), 0, viewModel.CanvasWidth),
-        (int) Math.Clamp(Math.Floor((e.GetPosition(CanvasBackground).Y - Board.Top) * Board.Zoom), 0, viewModel.CanvasHeight)
-    );
+    /// <summary>
+    /// Gives the mouse position in board cordinates (relative to board).
+    /// Result will always be clamped between 0 and board dimension in the corresponding direction.
+    /// </summary>
+    private Point MouseOverPixel(PointerEventArgs e)
+    {
+        // Zooming the board actually affects it's left and top as it zooms from the __WINDOW__ top left.
+        // we have to account for both the board drifting and the cordinate shift as a result of natural board
+        // zooming.
+        var boardLeft = Board.Left * Board.Zoom;
+        var boardTop = Board.Top * Board.Zoom;
+        var fromBoardX = e.GetPosition(CanvasBackground).X - boardLeft;
+        var fromBoardY = e.GetPosition(CanvasBackground).Y - boardTop;
+
+        var relativePos = new Point(
+            (int) Math.Clamp(Math.Floor(fromBoardX / Board.Zoom), 0, viewModel.CanvasWidth),
+            (int) Math.Clamp(Math.Floor(fromBoardY / Board.Zoom), 0, viewModel.CanvasHeight));
+
+        return relativePos;
+    }
 
     public MainWindow()
     {
@@ -111,6 +128,7 @@ public partial class MainWindow : Window
         }
         
         var mousePosition = MouseOverPixel(e);
+        Console.WriteLine($"{mousePosition.X}, {mousePosition.Y}");
         foreach (var selection in viewModel.Selections)
         {
             if (selection.TopLeft.X < mousePosition.X && selection.TopLeft.Y < mousePosition.Y &&
@@ -137,24 +155,24 @@ public partial class MainWindow : Window
                 && viewModel.CurrentSelection.TopLeft.X - 8 < mousePosition.X && Board.CurrentSelection.TopLeft.Y - 8 < mousePosition.Y
                 && viewModel.CurrentSelection.BottomRight.X + 8 > mousePosition.X && Board.CurrentSelection.BottomRight.Y + 8 > mousePosition.Y)
             {
-                if (Math.Abs(viewModel.CurrentSelection.TopLeft.X - mousePosition.X) < 4)
+                if (Math.Abs(viewModel.CurrentSelection.TopLeft.X - mousePosition.X) <handleClickRadius * Board.Zoom)
                 {
-                    if (Math.Abs(viewModel.CurrentSelection.TopLeft.Y - mousePosition.Y) < 4) // Tl handle
+                    if (Math.Abs(viewModel.CurrentSelection.TopLeft.Y - mousePosition.Y) <handleClickRadius * Board.Zoom) // Tl handle
                     {
                         viewModel.CurrentHandle = SelectionHandle.TopLeft;
                     }
-                    else if (Math.Abs(viewModel.CurrentSelection.BottomRight.Y - mousePosition.Y) < 4) // Bl handle
+                    else if (Math.Abs(viewModel.CurrentSelection.BottomRight.Y - mousePosition.Y) <handleClickRadius * Board.Zoom) // Bl handle
                     {
                         viewModel.CurrentHandle = SelectionHandle.BottomLeft;
                     }
                 }
-                else if (Math.Abs(viewModel.CurrentSelection.BottomRight.X - mousePosition.X) < 4)
+                else if (Math.Abs(viewModel.CurrentSelection.BottomRight.X - mousePosition.X) <handleClickRadius * Board.Zoom)
                 {
-                    if (Math.Abs(viewModel.CurrentSelection.BottomRight.Y - mousePosition.Y) < 4) // Br handle
+                    if (Math.Abs(viewModel.CurrentSelection.BottomRight.Y - mousePosition.Y) <handleClickRadius * Board.Zoom) // Br handle
                     {
                         viewModel.CurrentHandle = SelectionHandle.BottomRight;
                     }
-                    else if (Math.Abs(viewModel.CurrentSelection.TopLeft.Y - mousePosition.Y) < 4) // Tr handle
+                    else if (Math.Abs(viewModel.CurrentSelection.TopLeft.Y - mousePosition.Y) <handleClickRadius * Board.Zoom) // Tr handle
                     {
                         viewModel.CurrentHandle = SelectionHandle.TopRight;
                     }
@@ -166,7 +184,7 @@ public partial class MainWindow : Window
             }
             else
             {
-                var newSelection = Board.StartSelection(mousePosition, new Point(mousePosition.X + 4, mousePosition.Y + 4));
+                var newSelection = Board.StartSelection(mousePosition, new Point(mousePosition.X +handleClickRadius * Board.Zoom, mousePosition.Y +handleClickRadius * Board.Zoom));
                 viewModel.CurrentSelection = newSelection;
                 viewModel.CurrentHandle = SelectionHandle.BottomRight;
             }
@@ -236,21 +254,21 @@ public partial class MainWindow : Window
 
                 var topLeft = viewModel.CurrentHandle switch
                 {
-                    SelectionHandle.TopLeft => new Point(Math.Min(mousePosition.X, viewModel.CurrentSelection.BottomRight.X - 4),
-                            Math.Min(mousePosition.Y, viewModel.CurrentSelection.BottomRight.Y - 4)),
-                    SelectionHandle.BottomLeft => new Point(Math.Min(mousePosition.X, viewModel.CurrentSelection.BottomRight.X - 4),
+                    SelectionHandle.TopLeft => new Point(Math.Min(mousePosition.X, viewModel.CurrentSelection.BottomRight.X -handleClickRadius * Board.Zoom),
+                            Math.Min(mousePosition.Y, viewModel.CurrentSelection.BottomRight.Y -handleClickRadius * Board.Zoom)),
+                    SelectionHandle.BottomLeft => new Point(Math.Min(mousePosition.X, viewModel.CurrentSelection.BottomRight.X -handleClickRadius * Board.Zoom),
                         viewModel.CurrentSelection.TopLeft.Y),
                     SelectionHandle.TopRight => new Point(viewModel.CurrentSelection.TopLeft.X,
-                            Math.Min(mousePosition.Y, viewModel.CurrentSelection.BottomRight.Y - 4)),
+                            Math.Min(mousePosition.Y, viewModel.CurrentSelection.BottomRight.Y -handleClickRadius * Board.Zoom)),
                     _ => viewModel.CurrentSelection.TopLeft
                 };
                 var bottomRight = Board.CurrentHandle switch
                 {
                     SelectionHandle.BottomLeft => new Point(viewModel.CurrentSelection.BottomRight.X,
-                            Math.Max(mousePosition.Y, viewModel.CurrentSelection.TopLeft.Y + 4)),
-                    SelectionHandle.BottomRight => new Point(Math.Max(mousePosition.X, viewModel.CurrentSelection.TopLeft.X + 4),
-                            Math.Max(mousePosition.Y, viewModel.CurrentSelection.TopLeft.Y + 4)),
-                    SelectionHandle.TopRight => new Point(Math.Max(mousePosition.X, viewModel.CurrentSelection.TopLeft.X + 4), 
+                            Math.Max(mousePosition.Y, viewModel.CurrentSelection.TopLeft.Y +handleClickRadius * Board.Zoom)),
+                    SelectionHandle.BottomRight => new Point(Math.Max(mousePosition.X, viewModel.CurrentSelection.TopLeft.X +handleClickRadius * Board.Zoom),
+                            Math.Max(mousePosition.Y, viewModel.CurrentSelection.TopLeft.Y +handleClickRadius * Board.Zoom)),
+                    SelectionHandle.TopRight => new Point(Math.Max(mousePosition.X, viewModel.CurrentSelection.TopLeft.X +handleClickRadius * Board.Zoom), 
                             viewModel.CurrentSelection.BottomRight.Y),
                     _ => viewModel.CurrentSelection.BottomRight
                 };
@@ -266,7 +284,7 @@ public partial class MainWindow : Window
                 return;
             }
             
-            //Multiply be 1/zoom so that it always moves at a speed to make it seem to drag with the mouse regardless of zoom level
+            // Multiply be 1/zoom so that it always moves at a speed to make it seem to drag with the mouse regardless of zoom level
             Board.Left += (float) (e.GetPosition(CanvasBackground).X - mouseLast.X) * (1 / Board.Zoom);
             Board.Top += (float) (e.GetPosition(CanvasBackground).Y - mouseLast.Y) * (1 / Board.Zoom);
             
@@ -274,7 +292,9 @@ public partial class MainWindow : Window
             Board.Left = (float)Math.Clamp(Board.Left,
                 MainGrid.ColumnDefinitions[0].ActualWidth / 2 - viewModel.CanvasWidth * Board.Zoom,
                 MainGrid.ColumnDefinitions[0].ActualWidth / 2);
-            Board.Top = (float) Math.Clamp(Board.Top, Height / 2 - (viewModel.CanvasHeight) * Board.Zoom, Height / 2);
+            Board.Top = (float) Math.Clamp(Board.Top,
+                Height / 2 - viewModel.CanvasHeight * Board.Zoom,
+                Height / 2);
         }
         else
         {

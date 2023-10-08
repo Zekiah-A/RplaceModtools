@@ -12,6 +12,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using Avalonia.Threading;
 using DynamicData;
 using LibGit2Sharp;
@@ -71,7 +72,8 @@ public partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty] private ObservableCollection<ObservableObject> stateInfos = new();
     [ObservableProperty] public ObservableObject selectedStateInfo;
-    [ObservableProperty] private IImage? previewImageSource = new Bitmap("avares://../Assets/preview_default.png");
+    [ObservableProperty] private Bitmap? previewImageSource =
+        new(AssetLoader.Open(new Uri("avares://RplaceModtools/Assets/preview_default.png")));
 
     // TODO: Stand-in boolean to control hiding the initial presets and other panels
     [ObservableProperty] private bool startedAndConfigured;
@@ -106,6 +108,12 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void Start()
     {
+        // Stop debounce
+        if (StartedAndConfigured)
+        {
+            return;
+        }
+        
         //Configure the current session's data
         if (!ServerPresetExists(CurrentPreset))
         {
@@ -119,12 +127,12 @@ public partial class MainWindowViewModel : ObservableObject
             var boardNotification = App.Current.Services.GetRequiredService<NotificationStateInfoViewModel>();
             AddStateInfo(boardNotification);
             boardNotification.PersistsFor = TimeSpan.MaxValue;
-            boardNotification.Notification = "Loading canvas";
+            boardNotification.Notification = "Downloading current canvas";
 
             var boardPath = UriCombine(CurrentPreset.FileServer, CurrentPreset.MainBranch, CurrentPreset.PlacePath);
             var boardResponse = await Fetch(boardPath) ?? throw new Exception("Initial board load failed. Board response was null");
             BoardFetchSource.SetResult(await boardResponse.Content.ReadAsByteArrayAsync());
-            AddStateInfo(boardNotification);
+            RemoveStateInfo(boardNotification);
 
             //PreviewImg.Source = await CreateCanvasPreviewImage(boardResponse);
         });
@@ -192,40 +200,75 @@ public partial class MainWindowViewModel : ObservableObject
         var progressNotification = App.Current.Services.GetRequiredService<NotificationStateInfoViewModel>();
         AddStateInfo(progressNotification);
         progressNotification.PersistsFor = TimeSpan.MaxValue;
-        progressNotification.Notification = "Started loading canvas backup list: 0%.";
+        progressNotification.Notification = "Started loading canvas backup list...";
 
         if (CurrentPreset.LegacyServer)
         {
-            var nameMatches = RepositoryNameRegex().Match(CurrentPreset.BackupsRepository).Groups.Values.First();
-            var invalidChars = new string(Path.GetInvalidFileNameChars());
-            var safeRepositoryName = Regex.Replace(nameMatches.Value, $"[{Regex.Escape(invalidChars)}]", "_");
-            
-            var localPath = Path.Join(ProgramDirectory, safeRepositoryName);
-            if (!Directory.Exists(localPath))
+            try
             {
-                Repository.Clone(CurrentPreset.BackupsRepository, localPath, new CloneOptions
+                var nameMatches = RepositoryNameRegex().Match(CurrentPreset.BackupsRepository).Groups.Values.First();
+                var invalidChars = new string(Path.GetInvalidFileNameChars());
+                var safeRepositoryName = Regex.Replace(nameMatches.Value, $"[{Regex.Escape(invalidChars)}]", "_");
+                
+                var localPath = Path.Join(ProgramDirectory, safeRepositoryName);
+                if (!Directory.Exists(localPath))
                 {
-                    BranchName = CurrentPreset.MainBranch,
+                    Repository.Clone(CurrentPreset.BackupsRepository, localPath, new CloneOptions
+                    {
+                        //BranchName = CurrentPreset.MainBranch,
+                        OnTransferProgress = progress =>
+                        {
+                            var percent = (int) (progress.ReceivedObjects / (float) progress.TotalObjects * 100);
+                            progressNotification.Notification = $"Downloading canvas backups repository: {percent}%";
+                            return true;
+                        }
+                    });
+                }
+                
+                using var backupsRepository = new Repository(localPath);
+                // HACK: For some reason it may show no local branches
+                /*if (backupsRepository.Branches[CurrentPreset.MainBranch] is null)
+                {
+                    Console.WriteLine("WARN: Need to create local branch.");
+                     var localBranch = backupsRepository.CreateBranch(CurrentPreset.MainBranch);
+                    var trackBranch = "refs/remotes/origin/" + CurrentPreset.MainBranch; // Upstream branch
+                    backupsRepository.Branches.Update(localBranch, branchUpdater => branchUpdater.TrackedBranch = trackBranch);
+                    Console.WriteLine("WARN: Created local branch.");
+                }*/
+                var signature = new Signature("RplaceModtools", "modtools@rplace.live", DateTimeOffset.Now);
+                var mergeResult = Commands.Pull(backupsRepository, signature, new PullOptions()
+                {
+                    FetchOptions = new FetchOptions()
+                    {
+                        OnTransferProgress = progress =>
+                        {
+                            var percent = progress.ReceivedObjects / (float) progress.TotalObjects * 100;
+                            progressNotification.Notification = $"Fetching latest updates from backups repository: {percent}%";
+                            return true;
+                        },
+                    },
                 });
-            }
-            
-            using var backupsRepository = new Repository(localPath);
-            var signature = new Signature("RplaceModtools", "modtools@rplace.live", DateTimeOffset.Now);
-            var mergeResult = Commands.Pull(backupsRepository, signature, new PullOptions());
 
-            if (mergeResult.Status == MergeStatus.Conflicts)
+                if (mergeResult.Status == MergeStatus.Conflicts)
+                {
+                    Console.WriteLine($"Merge failed - serious file conflict. Try deleting local backups repository? ${localPath}");
+                }
+
+                var placePath = CurrentPreset.PlacePath.StartsWith("/") 
+                    ? CurrentPreset.PlacePath[1..]
+                    : CurrentPreset.PlacePath;
+                var commits = backupsRepository.Commits.QueryBy(placePath)
+                    .Select(commit => commit.Commit.Id.Sha).ToList();
+                
+                Backups = new ObservableCollection<string> { "place" };
+                Backups.AddRange(commits);
+            }
+            catch (Exception exception)
             {
-                Console.WriteLine($"Merge failed - serious file conflict. Try deleting local backups repository? ${localPath}");
+                progressNotification.Notification = "Failed to load canvas backups";
+                Console.WriteLine($"Failed to load canvas backups: {exception}");
+                await Task.Delay(TimeSpan.FromSeconds(2));
             }
-
-            var placePath = CurrentPreset.PlacePath.StartsWith("/") 
-                ? CurrentPreset.PlacePath[1..]
-                : CurrentPreset.PlacePath;
-            var commits = backupsRepository.Commits.QueryBy(placePath)
-                .Select(commit => commit.Commit.Id.Sha).ToList();
-            
-            Backups = new ObservableCollection<string> { "place" };
-            Backups.AddRange(commits);
         }
         else
         {
@@ -236,10 +279,12 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 return;
             }
-        
+
             var responseBody = await response.Content.ReadAsStringAsync();
             Backups.AddRange(responseBody.Split("\n"));
         }
+        
+        RemoveStateInfo(progressNotification);
     }
     
     private void BackupCheckInterval()
@@ -270,14 +315,21 @@ public partial class MainWindowViewModel : ObservableObject
         {
             lock (stateInfosLock)
             {
-                var statesToRemove = StateInfos
-                    .Where(info => info is ITransientStateInfo stateInfo
-                        && stateInfo.SpawnedOn + stateInfo.PersistsFor < DateTime.Now)
-                    .ToList();
-
-                foreach (var stateToRemove in statesToRemove)
+                try
                 {
-                    StateInfos.Remove(stateToRemove);
+                    var statesToRemove = StateInfos
+                        .Where(info => info is ITransientStateInfo stateInfo
+                            && stateInfo.SpawnedOn + stateInfo.PersistsFor < DateTime.Now)
+                        .ToList();
+
+                    foreach (var stateToRemove in statesToRemove)
+                    {
+                        StateInfos.Remove(stateToRemove);
+                    }
+                }
+                catch (Exception)
+                {
+                    // Ignore
                 }
             }
         };
