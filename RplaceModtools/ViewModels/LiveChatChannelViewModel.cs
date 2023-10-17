@@ -7,11 +7,11 @@ namespace RplaceModtools.ViewModels;
 public partial class LiveChatChannelViewModel : ObservableObject
 {
     [ObservableProperty] private string channelName;
-    [ObservableProperty] private ObservableCollection<ChatMessage> messages;
+    [ObservableProperty] private ObservableCollection<LiveChatMessage> messages;
 
     public LiveChatChannelViewModel(string channel)
     {
         channelName = channel;
-        messages = new ObservableCollection<ChatMessage>();
+        messages = new ObservableCollection<LiveChatMessage>();
     }
 }

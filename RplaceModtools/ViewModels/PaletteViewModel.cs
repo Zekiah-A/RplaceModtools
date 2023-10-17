@@ -10,7 +10,10 @@ namespace RplaceModtools.ViewModels;
 public partial class PaletteViewModel : ObservableObject
 {
     [ObservableProperty] private byte? currentColour;
-    
+
+    [ObservableProperty] private ObservableCollection<IBrush> avColours =
+        new(Colours.Select(item => new SolidColorBrush(new Color(255, item.Red, item.Green, item.Blue))));   
+
     public static readonly SKColor[] Colours =
     {
         new(109, 0, 26),

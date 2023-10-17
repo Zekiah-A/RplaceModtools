@@ -62,7 +62,7 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private ModerationAction currentModerationAction = ModerationAction.None;
     [ObservableProperty] private TimeSpan currentModerationDuration;
     [ObservableProperty] private string currentModerationReason = "";
-    [ObservableProperty] private string currentModerationUid = "";
+    [ObservableProperty] private uint currentModerationMessageId;
 
     [ObservableProperty] private ObservableCollection<ServerPreset> serverPresets;
     [ObservableProperty] private ServerPreset currentPreset = new();
@@ -74,8 +74,6 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] public ObservableObject selectedStateInfo;
     [ObservableProperty] private Bitmap? previewImageSource =
         new(AssetLoader.Open(new Uri("avares://RplaceModtools/Assets/preview_default.png")));
-
-    // TODO: Stand-in boolean to control hiding the initial presets and other panels
     [ObservableProperty] private bool startedAndConfigured;
 
     public string[] KnownWebsockets => new[]
@@ -99,6 +97,8 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly HttpClient client = new();
     private readonly object stateInfosLock = new();
     private const int PresetVersion = 0;
+    private readonly Dictionary<uint, uint> intIdPositions = new();
+    private readonly Dictionary<uint, string> intIdNames = new();
 
     public MainWindowViewModel()
     {
@@ -462,56 +462,91 @@ public partial class MainWindowViewModel : ObservableObject
                     });
                     break;
                 }
+                case 5: // Incoming pixel with placer intId name
+                {
+                    var i = 1;
+                    while (i < msg.Binary.Length)
+                    {
+                        var position = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan(i)); i += 4;
+                        var colour = msg.Binary[i++];
+                        var intId = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan(i)); i += 4;
+
+                        BoardSetPixel(new Pixel(position, colour));
+                        intIdPositions[position] = intId;
+                    }
+                    break;
+                }
                 case 6: //Incoming pixel someone else sent
                 {
-                    var i = 0;
-                    while (i < msg.Binary.Length - 2)
+                    var i = 1;
+                    while (i < msg.Binary.Length)
                     {
-                        var index = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan()[(i += 1)..]);
-                        var colour = msg.Binary[i += 4];
+                        var index = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan(i)); i += 4;
+                        var colour = msg.Binary[i++];
                         BoardSetPixel(new Pixel(index, colour));
-                        // TODO: Find a way to implement calling Board.Set from the VM (likely through an action/delegate to the view)
                     }
                     break;
                 }
                 case 15: // 15 = chat
                 {
-                    var msgData = Encoding.UTF8.GetString(msg.Binary.AsSpan()[1..]).Split("\n");
-                    var message = msgData[0];
-                    var name = msgData[1];
-                    var channelName = msgData[2];
-                    var type = msgData.ElementAtOrDefault(3);
-                    var x = msgData.ElementAtOrDefault(4);
-                    var y = msgData.ElementAtOrDefault(5);
-                    var uid = msgData.ElementAtOrDefault(6);
-                    
-                    if (type is null or "live")
-                    {
-                        Dispatcher.UIThread.Post(() => // TOD: Likely not needed now
-                        {
-                            var channelViewModel = liveChatVm.Channels.FirstOrDefault(channel => channel.ChannelName == channelName);
-                            if (channelViewModel is null)
-                            {
-                                channelViewModel = new LiveChatChannelViewModel(channelName);
-                                liveChatVm.Channels.Add(channelViewModel);
-                            }
+                    var offset = 1;
+                    var msgType = msg.Binary[offset++];
+                    var messageId = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan(offset));
+                    offset += 4;
+                    var txtLength = BinaryPrimitives.ReadUInt16BigEndian(msg.Binary.AsSpan(offset));
+                    offset += 2;
+                    var txt = Encoding.UTF8.GetString(msg.Binary, offset, txtLength);
+                    offset += txtLength;
+                    var intId = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan(offset));
+                    offset += 4; // sender int ID
+                    var name = intIdNames.GetValueOrDefault(intId) ?? "#" + intId;
 
-                            if (channelViewModel.Messages.Count > 100)
-                            {
-                                channelViewModel.Messages.RemoveAt(0);
-                            }
-                            
-                            channelViewModel.Messages.Add(new ChatMessage
-                            {
-                                Message = message,
-                                Name = name,
-                                Uid = uid
-                            });
+                    if (msgType == 0) // live
+                    {
+                        var sendDate = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan(offset));
+                        offset += 4;
+                        var reactionsL = msg.Binary[offset++];
+                        // TODO: Handle reactions
+                        // var reactions = ... TODO: Worry about this later
+                        var channelL = msg.Binary[offset++];
+                        var channelName = Encoding.UTF8.GetString(msg.Binary, offset, channelL);
+                        offset += channelL;
+
+                        var repliesTo = (uint) 0;
+
+                        if (msg.Binary.Length - offset >= 4)
+                        {
+                            repliesTo = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan(offset));
+                        }
+
+                        //Dispatcher.UIThread.Post(() =>
+                        //{
+                        var channelViewModel = liveChatVm.Channels
+                            .FirstOrDefault(channel => channel.ChannelName == channelName);
+                        if (channelViewModel is null)
+                        {
+                            channelViewModel = new LiveChatChannelViewModel(channelName);
+                            liveChatVm.Channels.Add(channelViewModel);
+                        }
+
+                        if (channelViewModel.Messages.Count > 100)
+                        {
+                            channelViewModel.Messages.RemoveAt(0);
+                        }
+                        
+                        channelViewModel.Messages.Add(new LiveChatMessage
+                        {
+                            MessageId = messageId,
+                            Message = txt,
+                            Name = name,
+                            SenderIntId = intId
                         });
+                        //});
                     }
                     else
                     {
-                        //Console.WriteLine($"Could not handle message: [{msgData[1]}/{msgData[2]}{(uid == null ? "" : "/" + uid)}] {msgData[0]}");
+                        var msgPos = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan(offset));
+                        txt = txt[..56];
                     }
                     break;
                 }

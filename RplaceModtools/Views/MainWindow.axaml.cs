@@ -254,9 +254,9 @@ public partial class MainWindow : Window
 
                 var topLeft = viewModel.CurrentHandle switch
                 {
-                    SelectionHandle.TopLeft => new Point(Math.Min(mousePosition.X, viewModel.CurrentSelection.BottomRight.X -handleClickRadius * Board.Zoom),
+                    SelectionHandle.TopLeft => new Point(Math.Min(mousePosition.X, viewModel.CurrentSelection.BottomRight.X - handleClickRadius * Board.Zoom),
                             Math.Min(mousePosition.Y, viewModel.CurrentSelection.BottomRight.Y -handleClickRadius * Board.Zoom)),
-                    SelectionHandle.BottomLeft => new Point(Math.Min(mousePosition.X, viewModel.CurrentSelection.BottomRight.X -handleClickRadius * Board.Zoom),
+                    SelectionHandle.BottomLeft => new Point(Math.Min(mousePosition.X, viewModel.CurrentSelection.BottomRight.X - handleClickRadius * Board.Zoom),
                         viewModel.CurrentSelection.TopLeft.Y),
                     SelectionHandle.TopRight => new Point(viewModel.CurrentSelection.TopLeft.X,
                             Math.Min(mousePosition.Y, viewModel.CurrentSelection.BottomRight.Y -handleClickRadius * Board.Zoom)),
@@ -265,10 +265,10 @@ public partial class MainWindow : Window
                 var bottomRight = Board.CurrentHandle switch
                 {
                     SelectionHandle.BottomLeft => new Point(viewModel.CurrentSelection.BottomRight.X,
-                            Math.Max(mousePosition.Y, viewModel.CurrentSelection.TopLeft.Y +handleClickRadius * Board.Zoom)),
-                    SelectionHandle.BottomRight => new Point(Math.Max(mousePosition.X, viewModel.CurrentSelection.TopLeft.X +handleClickRadius * Board.Zoom),
-                            Math.Max(mousePosition.Y, viewModel.CurrentSelection.TopLeft.Y +handleClickRadius * Board.Zoom)),
-                    SelectionHandle.TopRight => new Point(Math.Max(mousePosition.X, viewModel.CurrentSelection.TopLeft.X +handleClickRadius * Board.Zoom), 
+                            Math.Max(mousePosition.Y, viewModel.CurrentSelection.TopLeft.Y + handleClickRadius * Board.Zoom)),
+                    SelectionHandle.BottomRight => new Point(Math.Max(mousePosition.X, viewModel.CurrentSelection.TopLeft.X + handleClickRadius * Board.Zoom),
+                            Math.Max(mousePosition.Y, viewModel.CurrentSelection.TopLeft.Y + handleClickRadius * Board.Zoom)),
+                    SelectionHandle.TopRight => new Point(Math.Max(mousePosition.X, viewModel.CurrentSelection.TopLeft.X + handleClickRadius * Board.Zoom), 
                             viewModel.CurrentSelection.BottomRight.Y),
                     _ => viewModel.CurrentSelection.BottomRight
                 };
@@ -503,7 +503,7 @@ public partial class MainWindow : Window
         
         if (input.StartsWith(":help"))
         {
-            liveChatVm.CurrentChannel.Messages.Add(new ChatMessage
+            liveChatVm.CurrentChannel.Messages.Add(new LiveChatMessage
             {
                 Name = "!!",
                 Message = "Commands:\n :help, displays commands,\n`:name username` sets your livechat username"
@@ -513,7 +513,7 @@ public partial class MainWindow : Window
         {
             viewModel.CurrentPreset.ChatUsername = ChatInput.Text[5..].Trim();
             
-            liveChatVm.CurrentChannel.Messages.Add(new ChatMessage
+            liveChatVm.CurrentChannel.Messages.Add(new LiveChatMessage
             {
                 Name = "!!",
                 Message = "Chat username set to " + viewModel.CurrentPreset.ChatUsername
@@ -521,7 +521,7 @@ public partial class MainWindow : Window
         }
         else if (viewModel.CurrentPreset.ChatUsername is null)
         {
-            liveChatVm.CurrentChannel.Messages.Add(new ChatMessage
+            liveChatVm.CurrentChannel.Messages.Add(new LiveChatMessage
             {
                 Name = "!!",
                 Message = "No chat username set! Use command `:name username`, and use :help for more commands"
@@ -548,43 +548,43 @@ public partial class MainWindow : Window
         
         ActionConfigPanel.IsVisible = true;
         viewModel.CurrentModerationAction = ModerationAction.None;
-        viewModel.CurrentModerationUid = "";
+        viewModel.CurrentModerationMessageId = 0;
     }
 
     private void OnKickChatterPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (sender is not MenuItem { DataContext: ChatMessage message })
+        if (sender is not MenuItem { DataContext: LiveChatMessage message })
         {
             return;
         }
         
         ActionConfigPanel.IsVisible = true;
         viewModel.CurrentModerationAction = ModerationAction.Kick;
-        viewModel.CurrentModerationUid = message.Uid;
+        viewModel.CurrentModerationMessageId = message.MessageId;
     }
     
     private void OnMuteChatterPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (sender is not MenuItem { DataContext: ChatMessage message })
+        if (sender is not MenuItem { DataContext: LiveChatMessage message })
         {
             return;
         }
         
         ActionConfigPanel.IsVisible = true;
         viewModel.CurrentModerationAction = ModerationAction.Mute;
-        viewModel.CurrentModerationUid = message.Uid;
+        viewModel.CurrentModerationMessageId = message.MessageId;
     }
 
     private void OnBanChatterPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (sender is not MenuItem { DataContext: ChatMessage message })
+        if (sender is not MenuItem { DataContext: LiveChatMessage message })
         {
             return;
         }
         
         ActionConfigPanel.IsVisible = true;
         viewModel.CurrentModerationAction = ModerationAction.Ban;
-        viewModel.CurrentModerationUid = message.Uid;
+        viewModel.CurrentModerationMessageId = message.MessageId;
     }
 
     private void OnActionConfigSubmitPressed(object? sender, RoutedEventArgs e)
@@ -594,7 +594,7 @@ public partial class MainWindow : Window
             case ModerationAction.Kick:
             {
                 var reasonBytes = Encoding.UTF8.GetBytes(viewModel.CurrentModerationReason);
-                var uidBytes = Encoding.UTF8.GetBytes(viewModel.CurrentModerationUid);
+                var uidBytes = Encoding.UTF8.GetBytes(viewModel.CurrentModerationMessageId.ToString());
                 var kickBuffer = new byte[3 + uidBytes.Length + reasonBytes.Length];
                 kickBuffer[0] = 98;
                 kickBuffer[1] = (byte) ModerationAction.Kick;
@@ -610,7 +610,7 @@ public partial class MainWindow : Window
             case ModerationAction.Mute:
             {
                 var reasonBytes = Encoding.UTF8.GetBytes(viewModel.CurrentModerationReason);
-                var uidBytes = Encoding.UTF8.GetBytes(viewModel.CurrentModerationUid);
+                var uidBytes = Encoding.UTF8.GetBytes(viewModel.CurrentModerationMessageId.ToString());
                 var muteBuffer = new byte[7 + uidBytes.Length + reasonBytes.Length];
                 muteBuffer[0] = 98;
                 muteBuffer[1] = (byte) ModerationAction.Mute;
@@ -627,7 +627,7 @@ public partial class MainWindow : Window
             case ModerationAction.Ban:
             {
                 var reasonBytes = Encoding.UTF8.GetBytes(viewModel.CurrentModerationReason);
-                var uidBytes = Encoding.UTF8.GetBytes(viewModel.CurrentModerationUid);
+                var uidBytes = Encoding.UTF8.GetBytes(viewModel.CurrentModerationMessageId.ToString());
                 var muteBuffer = new byte[7 + uidBytes.Length + reasonBytes.Length];
                 muteBuffer[0] = 98;
                 muteBuffer[1] = (byte) ModerationAction.Ban;
@@ -648,7 +648,7 @@ public partial class MainWindow : Window
                 var uidBytesLength = 0;
                 if (!viewModel.CurrentModerationAll)
                 {
-                    uidBytes = Encoding.UTF8.GetBytes(viewModel.CurrentModerationUid);
+                    uidBytes = Encoding.UTF8.GetBytes(viewModel.CurrentModerationMessageId.ToString());
                     uidBytesLength = uidBytes.Length;
                 }
 
@@ -678,7 +678,7 @@ public partial class MainWindow : Window
     {
         ActionConfigPanel.IsVisible = false;
         viewModel.CurrentModerationAction = ModerationAction.None;
-        viewModel.CurrentModerationUid = "";
+        viewModel.CurrentModerationMessageId = 0;
     }
     
     private void OnLoadLocalClicked(object? sender, RoutedEventArgs e)

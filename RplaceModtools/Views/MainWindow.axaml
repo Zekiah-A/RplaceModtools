@@ -246,7 +246,7 @@
         <Border Grid.Column="0" Grid.ColumnSpan="2" x:Name="ActionConfigPanel" IsVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Width="380" Background="White" BorderBrush="Gray" BorderThickness="1" CornerRadius="8" ZIndex="8">
             <StackPanel Margin="8" Spacing="4">
                 <TextBlock FontSize="24">Manage user:</TextBlock>
-                <TextBox Text="{Binding CurrentModerationUid}"
+                <TextBox Text="{Binding CurrentModerationMessageId}"
                     IsVisible="{Binding CurrentModerationAll,
                         Converter={StaticResource NotConverter}}" Watermark="Player uid"></TextBox>
                 
@@ -333,8 +333,8 @@
             
             <!--Change this border into just the listbox, put the border around each element-->
                 <ListBox Classes="StateInfo" ItemsSource="{Binding StateInfos}"
-                         SelectedItem="{Binding SelectedStateInfo}" VerticalAlignment="Top"
-                         HorizontalAlignment="Right" Margin="16" ClipToBounds="True">
+                        SelectedItem="{Binding SelectedStateInfo}" VerticalAlignment="Top"
+                        HorizontalAlignment="Right" Margin="16" ClipToBounds="True">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
                             <views:SkBlurBehind BlurRadius="10">
@@ -489,30 +489,25 @@
                             <TabControl.DataTemplates> <!-- Contents -->
                                 <DataTemplate DataType="{x:Type vm:LiveChatChannelViewModel}">
                                     <ListBox ItemsSource="{Binding Messages}"
-                                             Background="Transparent">
+                                            Background="Transparent">
                                         <ListBox.ItemsPanel>
                                             <ItemsPanelTemplate>
                                                 <VirtualizingStackPanel></VirtualizingStackPanel>
                                             </ItemsPanelTemplate>
                                         </ListBox.ItemsPanel>
                                         <ListBox.ItemTemplate>
-                                            <DataTemplate DataType="{x:Type models:ChatMessage}">
+                                            <DataTemplate DataType="{x:Type models:LiveChatMessage}">
                                                 <TextBlock TextWrapping="Wrap">
                                                     <TextBlock.ContextMenu>
                                                         <ContextMenu>
-                                                            <MenuItem IsVisible="{Binding Uid,
-                                                            Converter={x:Static ObjectConverters.IsNotNull}}"
-                                                                      Header="{Binding Uid, StringFormat='Chatter ID: {0}'}"></MenuItem>
-                                                            <MenuItem IsVisible="{Binding Uid,
-                                                            Converter={x:Static ObjectConverters.IsNotNull}}"
-                                                                      PointerPressed="OnKickChatterPressed"
-                                                                      Header="{Binding Name, StringFormat='Kick {0}'}" />
-                                                            <MenuItem IsVisible="{Binding Uid,
-                                                            Converter={x:Static ObjectConverters.IsNotNull}}" PointerPressed="OnMuteChatterPressed"
-                                                                      Header="{Binding Name, StringFormat='Mute {0}'}" />
-                                                            <MenuItem IsEnabled="False" IsVisible="{Binding Uid,
-                                                            Converter={x:Static ObjectConverters.IsNotNull}}"
-                                                                      PointerPressed="OnBanChatterPressed" Header="{Binding Name, StringFormat='Ban {0}'}" />
+                                                            <MenuItem Header="{Binding SenderIntId, StringFormat='Sender ID: {0}'}"></MenuItem>
+                                                            <MenuItem Header="{Binding MessageId, StringFormat='Message ID: {0}'}"></MenuItem>
+                                                            <MenuItem PointerPressed="OnKickChatterPressed"
+                                                                Header="{Binding Name, StringFormat='Kick {0}'}" />
+                                                            <MenuItem PointerPressed="OnMuteChatterPressed"
+                                                                Header="{Binding Name, StringFormat='Mute {0}'}" />
+                                                            <MenuItem Header="{Binding Name, StringFormat='Ban {0}'}" 
+                                                                PointerPressed="OnBanChatterPressed" />
                                                         </ContextMenu>
                                                     </TextBlock.ContextMenu>
 
