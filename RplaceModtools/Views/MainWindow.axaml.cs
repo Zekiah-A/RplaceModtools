@@ -9,6 +9,7 @@ using Avalonia;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Platform.Storage;
 using DynamicData;
 using LibGit2Sharp;
 using Microsoft.Extensions.DependencyInjection;
@@ -128,7 +129,6 @@ public partial class MainWindow : Window
         }
         
         var mousePosition = MouseOverPixel(e);
-        Console.WriteLine($"{mousePosition.X}, {mousePosition.Y}");
         foreach (var selection in viewModel.Selections)
         {
             if (selection.TopLeft.X < mousePosition.X && selection.TopLeft.Y < mousePosition.Y &&
@@ -155,24 +155,24 @@ public partial class MainWindow : Window
                 && viewModel.CurrentSelection.TopLeft.X - 8 < mousePosition.X && Board.CurrentSelection.TopLeft.Y - 8 < mousePosition.Y
                 && viewModel.CurrentSelection.BottomRight.X + 8 > mousePosition.X && Board.CurrentSelection.BottomRight.Y + 8 > mousePosition.Y)
             {
-                if (Math.Abs(viewModel.CurrentSelection.TopLeft.X - mousePosition.X) <handleClickRadius * Board.Zoom)
+                if (Math.Abs(viewModel.CurrentSelection.TopLeft.X - mousePosition.X) < handleClickRadius * Board.Zoom)
                 {
-                    if (Math.Abs(viewModel.CurrentSelection.TopLeft.Y - mousePosition.Y) <handleClickRadius * Board.Zoom) // Tl handle
+                    if (Math.Abs(viewModel.CurrentSelection.TopLeft.Y - mousePosition.Y) < handleClickRadius * Board.Zoom) // Tl handle
                     {
                         viewModel.CurrentHandle = SelectionHandle.TopLeft;
                     }
-                    else if (Math.Abs(viewModel.CurrentSelection.BottomRight.Y - mousePosition.Y) <handleClickRadius * Board.Zoom) // Bl handle
+                    else if (Math.Abs(viewModel.CurrentSelection.BottomRight.Y - mousePosition.Y) < handleClickRadius * Board.Zoom) // Bl handle
                     {
                         viewModel.CurrentHandle = SelectionHandle.BottomLeft;
                     }
                 }
-                else if (Math.Abs(viewModel.CurrentSelection.BottomRight.X - mousePosition.X) <handleClickRadius * Board.Zoom)
+                else if (Math.Abs(viewModel.CurrentSelection.BottomRight.X - mousePosition.X) < handleClickRadius * Board.Zoom)
                 {
-                    if (Math.Abs(viewModel.CurrentSelection.BottomRight.Y - mousePosition.Y) <handleClickRadius * Board.Zoom) // Br handle
+                    if (Math.Abs(viewModel.CurrentSelection.BottomRight.Y - mousePosition.Y) < handleClickRadius * Board.Zoom) // Br handle
                     {
                         viewModel.CurrentHandle = SelectionHandle.BottomRight;
                     }
-                    else if (Math.Abs(viewModel.CurrentSelection.TopLeft.Y - mousePosition.Y) <handleClickRadius * Board.Zoom) // Tr handle
+                    else if (Math.Abs(viewModel.CurrentSelection.TopLeft.Y - mousePosition.Y) < handleClickRadius * Board.Zoom) // Tr handle
                     {
                         viewModel.CurrentHandle = SelectionHandle.TopRight;
                     }
@@ -184,7 +184,7 @@ public partial class MainWindow : Window
             }
             else
             {
-                var newSelection = Board.StartSelection(mousePosition, new Point(mousePosition.X +handleClickRadius * Board.Zoom, mousePosition.Y +handleClickRadius * Board.Zoom));
+                var newSelection = Board.StartSelection(mousePosition, new Point(mousePosition.X + handleClickRadius * Board.Zoom, mousePosition.Y + handleClickRadius * Board.Zoom));
                 viewModel.CurrentSelection = newSelection;
                 viewModel.CurrentHandle = SelectionHandle.BottomRight;
             }
@@ -511,7 +511,7 @@ public partial class MainWindow : Window
         }
         else if (input.StartsWith(":name"))
         {
-            viewModel.CurrentPreset.ChatUsername = ChatInput.Text[5..].Trim();
+            viewModel.CurrentPreset.ChatUsername = ChatInput!.Text![5..].Trim();
             
             liveChatVm.CurrentChannel.Messages.Add(new LiveChatMessage
             {
@@ -529,16 +529,28 @@ public partial class MainWindow : Window
         }
         else
         {
-            var chatBuilder = new StringBuilder();
-            chatBuilder.AppendLine(input);
-            chatBuilder.AppendLine(viewModel.CurrentPreset.ChatUsername);
-            chatBuilder.AppendLine(liveChatVm.CurrentChannel.ChannelName);
-            chatBuilder.AppendLine("live");
-            chatBuilder.AppendLine("0");
-            chatBuilder.AppendLine("0");
+            var encodedMsg = Encoding.UTF8.GetBytes(input);
+            var encodedChannel = Encoding.UTF8.GetBytes(liveChatVm.CurrentChannel.ChannelName);
+            var messageData = new Span<byte>(new byte[1 + 1 + 2 + encodedMsg.Length + 1 +
+                encodedChannel.Length + (false ? 4 : 0)]); // TODO: Current reply
+            
+            var offset = 0;
+            messageData[offset++] = 15;
+            messageData[offset++] = 0;
+            BinaryPrimitives.WriteUInt16BigEndian(messageData[offset..(offset += 2)], (ushort)encodedMsg.Length);
+            encodedMsg.CopyTo(messageData[offset..]);
+            offset += encodedMsg.Length;
+            messageData[offset++] = (byte) encodedChannel.Length;
+            encodedChannel.CopyTo(messageData[offset..]);
+            /*offset += (byte) encodedChannel.Length;
+            if (currentReply)
+            {
+                BinaryPrimitives.WriteUInt32BigEndian(messageData[offset..], 0);
+            }*/
+
             if (viewModel.Socket is { IsRunning: true })
             {
-                viewModel.Socket.Send(Encoding.UTF8.GetBytes("\x0f" + chatBuilder));
+                viewModel.Socket.Send(messageData.ToArray());
             }
         }
     }
@@ -677,12 +689,81 @@ public partial class MainWindow : Window
     private void ResetCurrentModerationAction()
     {
         ActionConfigPanel.IsVisible = false;
-        viewModel.CurrentModerationAction = ModerationAction.None;
+        viewModel.CurrentModerationAction = ModerationAction.None; 
         viewModel.CurrentModerationMessageId = 0;
     }
     
     private void OnLoadLocalClicked(object? sender, RoutedEventArgs e)
     {
-        throw new NotImplementedException();
+        Console.WriteLine($"Error: {nameof(OnLoadLocalClicked)} not implemented!");
+        return;
+    }
+
+    private void OnLoadImageClicked(object? sender, RoutedEventArgs e)
+    {
+        ImageConfigPanel.IsVisible = true;
+    }
+
+    private async void OnLoadImageFromFileClicked(object? sender, RoutedEventArgs e)
+    {
+        var topLevel = GetTopLevel(this);
+        if (topLevel is null)
+        {
+            Console.WriteLine("Failed to load image from file, topLevel was null.");
+            return;
+        }
+        var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Open image file",
+            AllowMultiple = false
+        });
+
+        if (files.Count >= 1)
+        {
+            await using var stream = await files[0].OpenReadAsync();
+            // Hand over image to VM
+        }
+    }
+
+    private async void OnLoadImageFromUrlClicked(object? sender, RoutedEventArgs e)
+    {
+        var imageUrl = ImageUrl.Text;
+        if (imageUrl is null)
+        {
+            Console.WriteLine("Could not load image from url, url was null.");
+            return;
+        }
+
+        using var httpClient = new HttpClient();
+        try
+        {
+            var response = await httpClient.GetAsync(imageUrl);
+            if (response.IsSuccessStatusCode)
+            {
+                if (response.Content.Headers.ContentType != null && response.Content.Headers.ContentType.MediaType.StartsWith("image"))
+                {
+                    // Download the image content
+                    var imageBytes = await response.Content.ReadAsByteArrayAsync();
+
+                    // Save the image to a file or process the image data as needed
+                    // For example, save to a file:
+                    File.WriteAllBytes("downloaded_image.jpg", imageBytes);
+
+                    Console.WriteLine("Image downloaded successfully!");
+                }
+                else
+                {
+                    Console.WriteLine("The URL does not point to an image.");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"Failed to download image. Status code: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"An error occurred: {ex.Message}");
+        }
     }
 }

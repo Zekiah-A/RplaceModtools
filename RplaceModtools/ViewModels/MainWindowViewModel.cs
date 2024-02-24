@@ -13,7 +13,6 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
-using Avalonia.Threading;
 using DynamicData;
 using LibGit2Sharp;
 using Timer =  System.Timers.Timer;
@@ -75,6 +74,14 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private Bitmap? previewImageSource =
         new(AssetLoader.Open(new Uri("avares://RplaceModtools/Assets/preview_default.png")));
     [ObservableProperty] private bool startedAndConfigured;
+    
+    // Image canvas paste stuff
+    [ObservableProperty] private string loadImageStatus = "No image loaded";
+    [ObservableProperty] private int imageWidth;
+    [ObservableProperty] private int imageHeight;
+    [ObservableProperty] private int imageX;
+    [ObservableProperty] private int imageY;
+    [ObservableProperty] private IImage imagePreview;
 
     public string[] KnownWebsockets => new[]
     {
@@ -99,6 +106,7 @@ public partial class MainWindowViewModel : ObservableObject
     private const int PresetVersion = 0;
     private readonly Dictionary<uint, uint> intIdPositions = new();
     private readonly Dictionary<uint, string> intIdNames = new();
+    private uint intId = 0;
 
     public MainWindowViewModel()
     {
@@ -204,6 +212,8 @@ public partial class MainWindowViewModel : ObservableObject
 
         if (CurrentPreset.LegacyServer)
         {
+            // TODO: This is borken
+            return;
             try
             {
                 var nameMatches = RepositoryNameRegex().Match(CurrentPreset.BackupsRepository).Groups.Values.First();
@@ -409,6 +419,7 @@ public partial class MainWindowViewModel : ObservableObject
                 Options = { KeepAliveInterval = TimeSpan.FromSeconds(5) }
             };
             wsClient.Options.SetRequestHeader("Origin", "https://rplace.live");
+            //wsClient.Options.SetRequestHeader("Cookies", tokenCookie);
             return wsClient;
         });
         Socket = new WebsocketClient(uri, factory)
@@ -418,6 +429,7 @@ public partial class MainWindowViewModel : ObservableObject
         
         Socket.MessageReceived.Subscribe(msg =>
         {
+            var data = msg.Binary.AsSpan();
             var code = msg.Binary[0];
             switch (code)
             {
@@ -487,42 +499,82 @@ public partial class MainWindowViewModel : ObservableObject
                     }
                     break;
                 }
+                case 7: // Rejected pixel
+                {
+                    var index = BinaryPrimitives.ReadUInt32BigEndian(data[1..]);
+                    var colour = data[5];
+                    BoardSetPixel(new Pixel(index, colour));
+                    break;
+                }
+                case 11:  // Client int ID
+                {
+                    intId = BinaryPrimitives.ReadUInt32BigEndian(data[1..]);
+                    break;
+                }
+                case 12: // Name info
+                {
+                    var i = 1;
+                    while (i < msg.Binary.Length)
+                    {
+                        var pIntId = BinaryPrimitives.ReadUInt32BigEndian(data[i..]); i += 4;
+                        var pNameLen = data[i++];
+                        var pName = Encoding.UTF8.GetString(data[i..(i += pNameLen)]);
+
+                        intIdNames[pIntId] = pName;
+                        // Occurs either if server has sent us name it has remembered from a previous session,
+                        // or we have just sent server packet 12 name update, and it is sending us back our name
+                        if (pIntId == intId)
+                        {
+                            CurrentPreset.ChatUsername = pName;
+                        }
+                    }
+
+                    break;
+                }
                 case 15: // 15 = chat
                 {
                     var offset = 1;
                     var msgType = msg.Binary[offset++];
-                    var messageId = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan(offset));
+                    var messageId = BinaryPrimitives.ReadUInt32BigEndian(data[offset..]);
                     offset += 4;
-                    var txtLength = BinaryPrimitives.ReadUInt16BigEndian(msg.Binary.AsSpan(offset));
+                    var txtLength = BinaryPrimitives.ReadUInt16BigEndian(data[offset..]);
                     offset += 2;
                     var txt = Encoding.UTF8.GetString(msg.Binary, offset, txtLength);
                     offset += txtLength;
-                    var intId = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan(offset));
+                    var senderIntId = BinaryPrimitives.ReadUInt32BigEndian(data[offset..]);
                     offset += 4; // sender int ID
-                    var name = intIdNames.GetValueOrDefault(intId) ?? "#" + intId;
+                    var name = intIdNames.GetValueOrDefault(senderIntId) ?? "#" + senderIntId;
 
                     if (msgType == 0) // live
                     {
-                        var sendDate = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan(offset));
+                        var liveChatMessage = new LiveChatMessage
+                        {
+                            MessageId = messageId,
+                            Message = txt,
+                            Name = name,
+                            SenderIntId = senderIntId
+                        };
+                        
+                        var sendDate = BinaryPrimitives.ReadUInt32BigEndian(data[offset..]);
                         offset += 4;
+                        liveChatMessage.SendDate = DateTimeOffset.FromUnixTimeSeconds(sendDate);
+                        
                         var reactionsL = msg.Binary[offset++];
                         // TODO: Handle reactions
-                        // var reactions = ... TODO: Worry about this later
+                        
                         var channelL = msg.Binary[offset++];
                         var channelName = Encoding.UTF8.GetString(msg.Binary, offset, channelL);
                         offset += channelL;
-
-                        var repliesTo = (uint) 0;
-
-                        if (msg.Binary.Length - offset >= 4)
-                        {
-                            repliesTo = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan(offset));
-                        }
-
-                        //Dispatcher.UIThread.Post(() =>
-                        //{
                         var channelViewModel = liveChatVm.Channels
                             .FirstOrDefault(channel => channel.ChannelName == channelName);
+                        
+                        if (msg.Binary.Length - offset >= 4)
+                        {
+                            var repliesId = BinaryPrimitives.ReadUInt32BigEndian(data[offset..]);
+                            liveChatMessage.RepliesTo =
+                                channelViewModel?.Messages.FirstOrDefault(message => message.MessageId == repliesId);
+                        }
+                        
                         if (channelViewModel is null)
                         {
                             channelViewModel = new LiveChatChannelViewModel(channelName);
@@ -534,19 +586,15 @@ public partial class MainWindowViewModel : ObservableObject
                             channelViewModel.Messages.RemoveAt(0);
                         }
                         
-                        channelViewModel.Messages.Add(new LiveChatMessage
-                        {
-                            MessageId = messageId,
-                            Message = txt,
-                            Name = name,
-                            SenderIntId = intId
-                        });
-                        //});
+                        channelViewModel.Messages.Add(liveChatMessage);
                     }
                     else
                     {
-                        var msgPos = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan(offset));
-                        txt = txt[..56];
+                        var msgPos = BinaryPrimitives.ReadUInt32BigEndian(data[offset..]);
+                        if (txt.Length > 56)
+                        {
+                            txt = txt[..56];
+                        }
                     }
                     break;
                 }

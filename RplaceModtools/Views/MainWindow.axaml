@@ -6,7 +6,6 @@
         xmlns:views="clr-namespace:RplaceModtools.Views"
         xmlns:rplaceModtools="clr-namespace:RplaceModtools"
         xmlns:models="clr-namespace:RplaceModtools.Models"
-        xmlns:componentModel="clr-namespace:CommunityToolkit.Mvvm.ComponentModel;assembly=CommunityToolkit.Mvvm"
         mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="600" MinWidth="400"
         x:Class="RplaceModtools.Views.MainWindow"
         Icon="/Assets/favicon.ico"
@@ -242,7 +241,26 @@
                 <Button Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Bottom" CornerRadius="5" Padding="40 10 40 10" Margin="5" Command="{Binding StartCommand}">Start</Button>
             </Grid>
         </Border>
-
+        
+        <!--Image load config-->
+        <Border Grid.Column="0" Grid.ColumnSpan="2" x:Name="ImageConfigPanel" IsVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Width="380" Background="White" BorderBrush="Gray" BorderThickness="1" CornerRadius="8" ZIndex="8">
+            <StackPanel Margin="8" Spacing="4">
+                <TextBlock>Load image:</TextBlock>
+                <Grid ColumnDefinitions="* Auto">
+                    <TextBox Grid.Column="0" Watermark="From URL" x:Name="ImageUrl"></TextBox>
+                    <Button Grid.Column="1" Click="OnLoadImageFromUrlClicked">Load Image</Button>
+                </Grid>
+                <Button Click="OnLoadImageFromFileClicked">Select file</Button>
+                <TextBox Text="{Binding LoadImageStatus}"></TextBox>
+                <NumericUpDown Value="{Binding ImageWidth}" Minimum="0" Maximum="256"></NumericUpDown>
+                <NumericUpDown Value="{Binding ImageHeight}" Minimum="0" Maximum="256"></NumericUpDown>
+                <NumericUpDown Value="{Binding ImageX}" Minimum="0" Maximum="{Binding CanvasWidth}"></NumericUpDown>
+                <NumericUpDown Value="{Binding ImageY}" Minimum="0" Maximum="{Binding CanvasHeight}"></NumericUpDown>
+                <Image Source="{Binding ImagePreview}"></Image>
+            </StackPanel>
+        </Border>
+        
+        <!--Mod actions-->
         <Border Grid.Column="0" Grid.ColumnSpan="2" x:Name="ActionConfigPanel" IsVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Width="380" Background="White" BorderBrush="Gray" BorderThickness="1" CornerRadius="8" ZIndex="8">
             <StackPanel Margin="8" Spacing="4">
                 <TextBlock FontSize="24">Manage user:</TextBlock>
@@ -269,6 +287,10 @@
                 </ToggleSwitch>
                 <StackPanel>
                     <TextBlock FontWeight="Bold">Action:</TextBlock>
+                    <RadioButton IsChecked="{Binding CurrentModerationAction,
+                            Converter={StaticResource ValueEqualsConverter},
+                            ConverterParameter={x:Static rplaceModtools:ModerationAction.Delete}}"
+                        >Delete message</RadioButton>
                     <RadioButton IsChecked="{Binding CurrentModerationAction,
                             Converter={StaticResource ValueEqualsConverter},
                             ConverterParameter={x:Static rplaceModtools:ModerationAction.Kick}}"
@@ -466,12 +488,15 @@
                                 </ToolTip.Tip>
                                 View selected area at backup
                             </ToggleSwitch>
-                            <Grid ColumnDefinitions="* Auto">
+                            <Grid ColumnDefinitions="* Auto Auto">
                                 <Button Grid.Column="0" Margin="5" HorizontalAlignment="Stretch" Command="{Binding RollbackSelectedAreaCommand}">
                                     <ToolTip.Tip>Revert the selected area of the canvas to a previous date.</ToolTip.Tip>Rollback selected area
                                 </Button>
                                 <Button Grid.Column="1" Margin="5" HorizontalAlignment="Stretch" Click="OnLoadLocalClicked">
                                     <ToolTip.Tip>Load a place file from your local device for rollback</ToolTip.Tip>📂
+                                </Button>
+                                <Button Grid.Column="2" Margin="5" HorizontalAlignment="Stretch" Click="OnLoadImageClicked">
+                                    <ToolTip.Tip>Load an image from local device to be used for rollback</ToolTip.Tip>📂
                                 </Button>
                             </Grid>
                         </StackPanel>
@@ -480,6 +505,11 @@
                 <TabItem Header="Live chat">
                     <Grid x:Name="LiveChatGridContainer" RowDefinitions="* Auto" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                         <Grid.DataContext><vm:LiveChatViewModel></vm:LiveChatViewModel></Grid.DataContext>
+                        <Grid.Styles>
+                            <Style Selector="TabControl">
+                                <Setter Property="Padding" Value="0" />
+                            </Style>
+                        </Grid.Styles>
                         <TabControl x:Name="LiveChatTabs" Grid.Row="0"  ItemsSource="{Binding Channels}" SelectedItem="{Binding CurrentChannel}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                             <TabControl.ItemTemplate> <!-- Header -->
                                 <DataTemplate>
@@ -490,6 +520,11 @@
                                 <DataTemplate DataType="{x:Type vm:LiveChatChannelViewModel}">
                                     <ListBox ItemsSource="{Binding Messages}"
                                             Background="Transparent">
+                                        <ListBox.Styles>
+                                            <Style Selector="ListBoxItem">
+                                                <Setter Property="Padding" Value="0" />
+                                            </Style>
+                                        </ListBox.Styles>
                                         <ListBox.ItemsPanel>
                                             <ItemsPanelTemplate>
                                                 <VirtualizingStackPanel></VirtualizingStackPanel>
@@ -497,23 +532,35 @@
                                         </ListBox.ItemsPanel>
                                         <ListBox.ItemTemplate>
                                             <DataTemplate DataType="{x:Type models:LiveChatMessage}">
-                                                <TextBlock TextWrapping="Wrap">
-                                                    <TextBlock.ContextMenu>
-                                                        <ContextMenu>
-                                                            <MenuItem Header="{Binding SenderIntId, StringFormat='Sender ID: {0}'}"></MenuItem>
-                                                            <MenuItem Header="{Binding MessageId, StringFormat='Message ID: {0}'}"></MenuItem>
-                                                            <MenuItem PointerPressed="OnKickChatterPressed"
-                                                                Header="{Binding Name, StringFormat='Kick {0}'}" />
-                                                            <MenuItem PointerPressed="OnMuteChatterPressed"
-                                                                Header="{Binding Name, StringFormat='Mute {0}'}" />
-                                                            <MenuItem Header="{Binding Name, StringFormat='Ban {0}'}" 
-                                                                PointerPressed="OnBanChatterPressed" />
-                                                        </ContextMenu>
-                                                    </TextBlock.ContextMenu>
-
-                                                    <Run FontWeight="Bold" Foreground="{Binding Path=Name, Converter={StaticResource HashColourConverter}}" Text="{Binding Path=Name}" />
-                                                    <Run Text="{Binding Path=Message}" />
-                                                </TextBlock>
+                                                <StackPanel>
+                                                    <StackPanel.Styles>
+                                                        <Style Selector="StackPanel">
+                                                            <Setter Property="Cursor" Value="Hand" />
+                                                        </Style>
+                                                    </StackPanel.Styles>
+                                                    <StackPanel Orientation="Horizontal" Opacity="0.6" IsVisible="{Binding RepliesTo, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                                        <Border CornerRadius="4 0 0 0" Background="Black" Width="3" VerticalAlignment="Stretch" />
+                                                        <Image Source="../Assets/reply.png" />
+                                                        <TextBlock FontWeight="Bold" FontStyle="Italic" Text="{Binding RepliesTo.Name, FallbackValue='??????'}" />
+                                                        <TextBlock FontWeight="Bold" FontStyle="Italic" Text="{Binding RepliesTo.Message, FallbackValue='Message could not be loaded'}" />
+                                                    </StackPanel>
+                                                    <TextBlock TextWrapping="Wrap">
+                                                        <TextBlock.ContextMenu>
+                                                            <ContextMenu>
+                                                                <MenuItem Header="{Binding SenderIntId, StringFormat='Sender ID: {0}'}"></MenuItem>
+                                                                <MenuItem Header="{Binding MessageId, StringFormat='Message ID: {0}'}"></MenuItem>
+                                                                <MenuItem PointerPressed="OnKickChatterPressed"
+                                                                    Header="{Binding Name, StringFormat='Kick {0}'}" />
+                                                                <MenuItem PointerPressed="OnMuteChatterPressed"
+                                                                    Header="{Binding Name, StringFormat='Mute {0}'}" />
+                                                                <MenuItem Header="{Binding Name, StringFormat='Ban {0}'}" 
+                                                                    PointerPressed="OnBanChatterPressed" />
+                                                            </ContextMenu>
+                                                        </TextBlock.ContextMenu>
+                                                        <Run FontWeight="Bold" Foreground="{Binding Name, Converter={StaticResource HashColourConverter}}" Text="{Binding Path=Name}" />
+                                                        <Run Text="{Binding Message}" />
+                                                    </TextBlock>
+                                                </StackPanel>
                                             </DataTemplate>
                                         </ListBox.ItemTemplate>
                                     </ListBox>

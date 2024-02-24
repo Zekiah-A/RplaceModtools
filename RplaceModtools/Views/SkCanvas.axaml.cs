@@ -344,7 +344,7 @@ public partial class SkCanvas : UserControl
                 using var selInfoPaint = new SKPaint()
                 {
                     TextSize = 18,
-                    Color = SKColors.White,
+                    Color = selWidth < 256 && selHeight < 256 ? SKColors.White : SKColors.Red,
                     IsAntialias = true
                 };
                 using var selInfoOutlinePaint = new SKPaint()

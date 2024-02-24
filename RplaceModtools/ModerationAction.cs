@@ -6,5 +6,6 @@ public enum ModerationAction : byte
     Mute = 1,
     Ban = 2,
     Captcha = 3,
+    Delete = 4,
     None
 }
