@@ -13,7 +13,7 @@ public partial class ServerPreset : ObservableObject
     [ObservableProperty] private string placePath = "/place";
     
     // Legacy server only
-    [ObservableProperty] private string backupsRepository = "https://github.com/rplacetk/canvas1.git";
+    [ObservableProperty] private string backupsRepository = "https://github.com/rplacetk/canvas1";
     [ObservableProperty] private string mainBranch = "main";
 
     // New server only

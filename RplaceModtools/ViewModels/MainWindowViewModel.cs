@@ -19,6 +19,12 @@ using Timer =  System.Timers.Timer;
 using Avalonia.Styling;
 using RplaceModtools.Views;
 using SkiaSharp;
+using System.Text.Json;
+using System.Net.Http.Json;
+using System.Web;
+using System.Runtime.InteropServices;
+using System.Diagnostics;
+using System.Net.Http.Headers;
 
 namespace RplaceModtools.ViewModels;
 public partial class MainWindowViewModel : ObservableObject
@@ -82,6 +88,10 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private int imageX;
     [ObservableProperty] private int imageY;
     [ObservableProperty] private IImage imagePreview;
+    
+    // Github code panel
+    [ObservableProperty] private bool githubCodePanelVisible;
+    [ObservableProperty] private string? githubCode;
 
     public string[] KnownWebsockets => new[]
     {
@@ -97,6 +107,7 @@ public partial class MainWindowViewModel : ObservableObject
     
     public Action<Pixel> BoardSetPixel { get; set; }
 
+    private const string GithubClientId = "3b37d31a1a87dd16d8e3";
     public static readonly string ProgramDirectory =
         Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RplaceModtools");
     private static readonly string presetPath =
@@ -138,7 +149,11 @@ public partial class MainWindowViewModel : ObservableObject
             boardNotification.Notification = "Downloading current canvas";
 
             var boardPath = UriCombine(CurrentPreset.FileServer, CurrentPreset.MainBranch, CurrentPreset.PlacePath);
-            var boardResponse = await Fetch(boardPath) ?? throw new Exception("Initial board load failed. Board response was null");
+            var boardResponse = await client.GetAsync(boardPath);
+            if (!boardResponse.IsSuccessStatusCode)
+            {
+                throw new Exception("Initial board load failed. Board response was null");
+            }
             BoardFetchSource.SetResult(await boardResponse.Content.ReadAsByteArrayAsync());
             RemoveStateInfo(boardNotification);
 
@@ -157,8 +172,8 @@ public partial class MainWindowViewModel : ObservableObject
     {
         async Task<byte[]?> FetchBoardAsync(Uri uri)
         {
-            var boardResponse = await Fetch(uri);
-            if (boardResponse is not null)
+            var boardResponse = await client.GetAsync(uri);
+            if (!boardResponse.IsSuccessStatusCode)
             {
                 return await boardResponse.Content.ReadAsByteArrayAsync();
             }
@@ -212,35 +227,158 @@ public partial class MainWindowViewModel : ObservableObject
 
         if (CurrentPreset.LegacyServer)
         {
-            // TODO: This is borken
-            return;
+            Backups = new ObservableCollection<string> { "place" };
+
+            // Fast path - Use github API (git cloning can be unbeliavably slow)
+            if (CurrentPreset.BackupsRepository.Contains("github.com"))
+            {
+                // 1 - Get github authorisation
+                var jsonOptions = new JsonSerializerOptions()
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+                };
+                
+                var codeRequestObject = new { ClientId = GithubClientId, Scope = "" };
+                var jsonHeaderValue = MediaTypeHeaderValue.Parse("application/json");
+                var codeRequestContent = JsonContent.Create(codeRequestObject, jsonHeaderValue, jsonOptions);
+                client.DefaultRequestHeaders.TryAddWithoutValidation("Accept",  "application/json");
+                var codeResponse = await client.PostAsync("https://github.com/login/device/code", codeRequestContent);
+                client.DefaultRequestHeaders.Clear();
+
+                if (!codeResponse.IsSuccessStatusCode)
+                {
+                    Console.WriteLine("Failed to load git commits from github API, HTTP response was not okay");
+                    RemoveStateInfo(progressNotification);
+                    return;
+                }
+                var code = await codeResponse.Content.ReadFromJsonAsync<GithubApiCode>(jsonOptions);
+                if (code is null)
+                {
+                    Console.WriteLine("Failed to load git commits from github API, HTTP response was not okay");
+                    RemoveStateInfo(progressNotification);
+                    return;
+                }
+
+                GithubCodePanelVisible = true;
+                GithubCode = code.UserCode;
+
+                // 2 - Open browser
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    Process.Start(code.VerificationUri);
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                {
+                    Process.Start("xdg-open", code.VerificationUri);
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    Process.Start("open", code.VerificationUri);
+                }
+
+                // 3 - Test authorisation
+                var authStart = DateTime.Now;
+                while ((DateTime.Now - authStart).TotalSeconds < code.ExpiresIn)
+                {
+                    var accessRequestObject = new GithubAccessRequest(GithubClientId, code.DeviceCode, "urn:ietf:params:oauth:grant-type:device_code");
+                    var accessRequestContent = JsonContent.Create(accessRequestObject, jsonHeaderValue, jsonOptions);
+                    client.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "application/json");
+                    var accessResponse = await client.PostAsync("https://github.com/login/oauth/access_token", accessRequestContent);
+                    client.DefaultRequestHeaders.Clear();
+                    if (!accessResponse.IsSuccessStatusCode)
+                    {
+                        var accessToken = await accessResponse.Content.ReadFromJsonAsync<GithubAccessToken>(jsonOptions);
+                        if (accessToken is not null)
+                        {
+                            GithubCodePanelVisible = false;
+                            Console.WriteLine(accessToken.AccessToken);
+                            break;
+                        }
+                    }
+                    
+                    await Task.Delay(code.Interval * 1000);
+                }
+
+                var newLocation = CurrentPreset.BackupsRepository.Replace("github.com", "api.github.com/repos");
+                var page = 1;
+                var commitCount = 0;
+                while (true)
+                {
+                    var url = new Uri($"{newLocation}/commits?per_page=100&page={page}");
+                    client.DefaultRequestHeaders.TryAddWithoutValidation("Accept",  "application/json");
+                    var response = await client.GetAsync(url);
+                    client.DefaultRequestHeaders.Clear();
+                    if (response is null || !response.IsSuccessStatusCode)
+                    {
+                        Console.WriteLine("Failed to load git commits from github API, HTTP response was not okay");
+                        RemoveStateInfo(progressNotification);
+                        return;
+                    }
+                    var commits = await response.Content.ReadFromJsonAsync<GithubApiCommit[]>(jsonOptions);
+                    if (commits is null || commits.Length == 0)
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        foreach (var commit in commits)
+                        {
+                            progressNotification.Notification =
+                                $"Downloading canvas backups from github: {commitCount} commits";
+                            Backups.Add(commit.Sha);
+                        }
+                        page++;
+                    }
+                }
+
+                RemoveStateInfo(progressNotification);
+                return;
+            }
+
             try
             {
                 var nameMatches = RepositoryNameRegex().Match(CurrentPreset.BackupsRepository).Groups.Values.First();
                 var invalidChars = new string(Path.GetInvalidFileNameChars());
                 var safeRepositoryName = Regex.Replace(nameMatches.Value, $"[{Regex.Escape(invalidChars)}]", "_");
-                
+
                 var localPath = Path.Join(ProgramDirectory, safeRepositoryName);
+                // Clear up incomplete clones
+                if (Directory.Exists(localPath))
+                {
+                    var contents = Directory.GetFileSystemEntries(localPath);
+                    if (contents.Length == 1 && Path.GetFileName(contents[0]) == ".git")
+                    {
+                        Directory.Delete(localPath, true);
+                    }
+                }
+                // Clone repo (will take a long time)
                 if (!Directory.Exists(localPath))
                 {
-                    Repository.Clone(CurrentPreset.BackupsRepository, localPath, new CloneOptions
+                    var cloneOptions = new CloneOptions
                     {
-                        //BranchName = CurrentPreset.MainBranch,
-                        OnTransferProgress = progress =>
+                        BranchName = CurrentPreset.MainBranch,
+                        IsBare = false,
+                        OnCheckoutProgress = (path, completedSteps, totalSteps) =>
                         {
-                            var percent = (int) (progress.ReceivedObjects / (float) progress.TotalObjects * 100);
-                            progressNotification.Notification = $"Downloading canvas backups repository: {percent}%";
-                            return true;
+                            progressNotification.Notification =
+                                $"Downloading canvas backups repository: (completed) {completedSteps}/{totalSteps} steps";
                         }
-                    });
+                    };
+                    cloneOptions.FetchOptions.OnTransferProgress = (transfer) =>
+                    {
+                        var percent = Math.Round((double) transfer.ReceivedObjects / transfer.TotalObjects, 2);
+                        progressNotification.Notification =
+                            $"Downloading canvas backups repository: (cloning) {percent}%";
+                        return true;
+                    };
+                    Repository.Clone(CurrentPreset.BackupsRepository, localPath, cloneOptions);
                 }
-                
                 using var backupsRepository = new Repository(localPath);
                 // HACK: For some reason it may show no local branches
                 /*if (backupsRepository.Branches[CurrentPreset.MainBranch] is null)
                 {
                     Console.WriteLine("WARN: Need to create local branch.");
-                     var localBranch = backupsRepository.CreateBranch(CurrentPreset.MainBranch);
+                    var localBranch = backupsRepository.CreateBranch(CurrentPreset.MainBranch);
                     var trackBranch = "refs/remotes/origin/" + CurrentPreset.MainBranch; // Upstream branch
                     backupsRepository.Branches.Update(localBranch, branchUpdater => branchUpdater.TrackedBranch = trackBranch);
                     Console.WriteLine("WARN: Created local branch.");
@@ -256,7 +394,12 @@ public partial class MainWindowViewModel : ObservableObject
                             progressNotification.Notification = $"Fetching latest updates from backups repository: {percent}%";
                             return true;
                         },
+
                     },
+                    MergeOptions = new MergeOptions()
+                    {
+                        MergeFileFavor = MergeFileFavor.Theirs
+                    }
                 });
 
                 if (mergeResult.Status == MergeStatus.Conflicts)
@@ -264,12 +407,12 @@ public partial class MainWindowViewModel : ObservableObject
                     Console.WriteLine($"Merge failed - serious file conflict. Try deleting local backups repository? ${localPath}");
                 }
 
-                var placePath = CurrentPreset.PlacePath.StartsWith("/") 
+                var placePath = CurrentPreset.PlacePath.StartsWith("/")
                     ? CurrentPreset.PlacePath[1..]
                     : CurrentPreset.PlacePath;
                 var commits = backupsRepository.Commits.QueryBy(placePath)
                     .Select(commit => commit.Commit.Id.Sha).ToList();
-                
+
                 Backups = new ObservableCollection<string> { "place" };
                 Backups.AddRange(commits);
             }
@@ -277,18 +420,14 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 progressNotification.Notification = "Failed to load canvas backups";
                 Console.WriteLine($"Failed to load canvas backups: {exception}");
-                await Task.Delay(TimeSpan.FromSeconds(2));
             }
         }
         else
         {
             var backupsUri = UriCombine(CurrentPreset.FileServer, CurrentPreset.BackupListPath);
-            var response = await Fetch(backupsUri);
+            var response = await client.GetAsync(backupsUri);
+            response.EnsureSuccessStatusCode();
             Backups = new ObservableCollection<string> { "place" };
-            if (response is null)
-            {
-                return;
-            }
 
             var responseBody = await response.Content.ReadAsStringAsync();
             Backups.AddRange(responseBody.Split("\n"));
@@ -859,8 +998,8 @@ public partial class MainWindowViewModel : ObservableObject
             ? UriCombine(CurrentPreset.FileServer, backupName, CurrentPreset.PlacePath)
             : UriCombine(CurrentPreset.FileServer, CurrentPreset.BackupsPath, backupName);
         
-        var boardResponse = await Fetch(backupUri);
-        if (boardResponse is null)
+        var boardResponse = await client.GetAsync(backupUri);
+        if (!boardResponse.IsSuccessStatusCode)
         {
             Console.WriteLine($"FATAL: Could not load place backup {backupName}");
             await ViewMainCanvas();
@@ -887,7 +1026,8 @@ public partial class MainWindowViewModel : ObservableObject
             ? UriCombine(CurrentPreset.FileServer, backupName, CurrentPreset.PlacePath)
             : UriCombine(CurrentPreset.FileServer, CurrentPreset.BackupsPath, backupName);
         
-        var backupResponse = await Fetch(backupUri);
+        var backupResponse = await client.GetAsync(backupUri);
+        backupResponse.EnsureSuccessStatusCode();
         var backupTask = backupResponse?.Content.ReadAsByteArrayAsync();
         if (backupTask is not null)
         {
@@ -927,19 +1067,6 @@ public partial class MainWindowViewModel : ObservableObject
             .Where(part => !string.IsNullOrEmpty(part))
             .Select(subPath => subPath.Trim('/'))
             .ToArray()));
-    }
-
-    public async Task<HttpResponseMessage?> Fetch(Uri uri)
-    {
-        try
-        {
-            var response = await client.GetAsync(uri);
-            response.EnsureSuccessStatusCode();
-            return response;
-        }
-        catch (HttpRequestException) { }
-        
-        return null;
     }
     
     [GeneratedRegex(@"github.com\/[\w\-]+\/([\w\-]+)")]

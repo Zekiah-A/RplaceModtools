@@ -241,6 +241,16 @@
                 <Button Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Bottom" CornerRadius="5" Padding="40 10 40 10" Margin="5" Command="{Binding StartCommand}">Start</Button>
             </Grid>
         </Border>
+
+        <!--Github code -->
+        <Border Grid.Column="0" Grid.ColumnSpan="2" x:Name="GithubCodePanel" IsVisible="{Binding GithubCodePanelVisible, Mode=OneWay}" HorizontalAlignment="Center" VerticalAlignment="Center" Width="380" Background="White" BorderBrush="Gray" BorderThickness="1" CornerRadius="8" ZIndex="8">
+            <StackPanel Margin="8" Spacing="4">
+                <TextBlock FontWeight="Bold">Github code:</TextBlock>
+                <SelectableTextBlock FontSize="36" FontWeight="Bold" Text="{Binding GithubCode}"></SelectableTextBlock>
+                <TextBlock TextWrapping="Wrap" HorizontalAlignment="Stretch">Enter this code in the github instance opened in your browser to continue</TextBlock>
+                <Button Click="OnGithubCodeCancelClicked">Cancel</Button>
+            </StackPanel>
+        </Border>
         
         <!--Image load config-->
         <Border Grid.Column="0" Grid.ColumnSpan="2" x:Name="ImageConfigPanel" IsVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Width="380" Background="White" BorderBrush="Gray" BorderThickness="1" CornerRadius="8" ZIndex="8">

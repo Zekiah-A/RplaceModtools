@@ -725,6 +725,11 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnGithubCodeCancelClicked(object? sender, RoutedEventArgs e)
+    {
+        GithubCodePanel.IsVisible = false;
+    }
+
     private async void OnLoadImageFromUrlClicked(object? sender, RoutedEventArgs e)
     {
         var imageUrl = ImageUrl.Text;

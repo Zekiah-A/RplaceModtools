@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
+using LibGit2Sharp;
 
 namespace RplaceModtools
 {
@@ -22,11 +23,9 @@ namespace RplaceModtools
             => AppBuilder.Configure<App>()
                 .UsePlatformDetect()
                 .LogToTrace();
-                //.UseReactiveUI();
 
         //.With(new Win32PlatformOptions { AllowEglInitialization = true }) //Perf optimisations
         //.With(new X11PlatformOptions { UseGpu = true, UseEGL = true })
         //.With(new AvaloniaNativePlatformOptions { UseGpu = true })
-        
     }
 }
