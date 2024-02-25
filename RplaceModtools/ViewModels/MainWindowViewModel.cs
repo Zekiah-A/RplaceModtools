@@ -118,6 +118,7 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly Dictionary<uint, uint> intIdPositions = new();
     private readonly Dictionary<uint, string> intIdNames = new();
     private uint intId = 0;
+    private GithubAccessToken? accessToken;
 
     public MainWindowViewModel()
     {
@@ -232,85 +233,100 @@ public partial class MainWindowViewModel : ObservableObject
             // Fast path - Use github API (git cloning can be unbeliavably slow)
             if (CurrentPreset.BackupsRepository.Contains("github.com"))
             {
-                // 1 - Get github authorisation
                 var jsonOptions = new JsonSerializerOptions()
                 {
                     PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
                 };
-                
-                var codeRequestObject = new { ClientId = GithubClientId, Scope = "" };
-                var jsonHeaderValue = MediaTypeHeaderValue.Parse("application/json");
-                var codeRequestContent = JsonContent.Create(codeRequestObject, jsonHeaderValue, jsonOptions);
-                client.DefaultRequestHeaders.TryAddWithoutValidation("Accept",  "application/json");
-                var codeResponse = await client.PostAsync("https://github.com/login/device/code", codeRequestContent);
-                client.DefaultRequestHeaders.Clear();
-
-                if (!codeResponse.IsSuccessStatusCode)
+                if (accessToken is null)
                 {
-                    Console.WriteLine("Failed to load git commits from github API, HTTP response was not okay");
-                    RemoveStateInfo(progressNotification);
-                    return;
-                }
-                var code = await codeResponse.Content.ReadFromJsonAsync<GithubApiCode>(jsonOptions);
-                if (code is null)
-                {
-                    Console.WriteLine("Failed to load git commits from github API, HTTP response was not okay");
-                    RemoveStateInfo(progressNotification);
-                    return;
-                }
-
-                GithubCodePanelVisible = true;
-                GithubCode = code.UserCode;
-
-                // 2 - Open browser
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                {
-                    Process.Start(code.VerificationUri);
-                }
-                else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                {
-                    Process.Start("xdg-open", code.VerificationUri);
-                }
-                else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                {
-                    Process.Start("open", code.VerificationUri);
-                }
-
-                // 3 - Test authorisation
-                var authStart = DateTime.Now;
-                while ((DateTime.Now - authStart).TotalSeconds < code.ExpiresIn)
-                {
-                    var accessRequestObject = new GithubAccessRequest(GithubClientId, code.DeviceCode, "urn:ietf:params:oauth:grant-type:device_code");
-                    var accessRequestContent = JsonContent.Create(accessRequestObject, jsonHeaderValue, jsonOptions);
-                    client.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "application/json");
-                    var accessResponse = await client.PostAsync("https://github.com/login/oauth/access_token", accessRequestContent);
+                    // 1 - Get github authorisation                    
+                    var codeRequestObject = new { ClientId = GithubClientId, Scope = "public_repo" };
+                    var jsonHeaderValue = MediaTypeHeaderValue.Parse("application/json");
+                    var codeRequestContent = JsonContent.Create(codeRequestObject, jsonHeaderValue, jsonOptions);
+                    client.DefaultRequestHeaders.TryAddWithoutValidation("Accept",  "application/json");
+                    var codeResponse = await client.PostAsync("https://github.com/login/device/code", codeRequestContent);
                     client.DefaultRequestHeaders.Clear();
-                    if (!accessResponse.IsSuccessStatusCode)
+
+                    if (!codeResponse.IsSuccessStatusCode)
                     {
-                        var accessToken = await accessResponse.Content.ReadFromJsonAsync<GithubAccessToken>(jsonOptions);
-                        if (accessToken is not null)
-                        {
-                            GithubCodePanelVisible = false;
-                            Console.WriteLine(accessToken.AccessToken);
-                            break;
-                        }
+                        Console.WriteLine("Failed to load git commits from github API, HTTP response was not okay");
+                        RemoveStateInfo(progressNotification);
+                        return;
                     }
-                    
-                    await Task.Delay(code.Interval * 1000);
+                    var code = await codeResponse.Content.ReadFromJsonAsync<GithubApiCode>(jsonOptions);
+                    if (code is null)
+                    {
+                        Console.WriteLine("Failed to load git commits from github API, HTTP response was not okay");
+                        RemoveStateInfo(progressNotification);
+                        return;
+                    }
+
+                    GithubCodePanelVisible = true;
+                    GithubCode = code.UserCode;
+
+                    // 2 - Open browser
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        Process.Start(code.VerificationUri);
+                    }
+                    else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                    {
+                        Process.Start("xdg-open", code.VerificationUri);
+                    }
+                    else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                    {
+                        Process.Start("open", code.VerificationUri);
+                    }
+
+                    // 3 - Test authorisation
+                    var tries = 1;
+                    var authStart = DateTime.Now;
+                    while ((DateTime.Now - authStart).TotalSeconds < code.ExpiresIn)
+                    {
+                        var accessRequestObject = new GithubAccessRequest(GithubClientId, code.DeviceCode, "urn:ietf:params:oauth:grant-type:device_code");
+                        var accessRequestContent = JsonContent.Create(accessRequestObject, jsonHeaderValue, jsonOptions);
+                        client.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "application/json");
+                        var accessResponse = await client.PostAsync("https://github.com/login/oauth/access_token", accessRequestContent);
+                        client.DefaultRequestHeaders.Clear();
+                        if (accessResponse.IsSuccessStatusCode)
+                        {
+                            var accessResponseText = await accessResponse.Content.ReadAsStringAsync();
+                            var error = JsonSerializer.Deserialize<GithubApiError>(accessResponseText, jsonOptions);
+                            if (error is null || string.IsNullOrEmpty(error.Error))
+                            {
+                                progressNotification.Notification =
+                                    $"Downloading canvas backup: (waiting for github auth) {tries}";
+                                accessToken = JsonSerializer.Deserialize<GithubAccessToken>(accessResponseText, jsonOptions);
+                                if (accessToken is not null)
+                                {
+                                    GithubCode = string.Empty;
+                                    GithubCodePanelVisible = false;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        await Task.Delay(code.Interval * 1000);
+                        tries++;
+                    }
                 }
 
+                // Pull commit hashes with API
                 var newLocation = CurrentPreset.BackupsRepository.Replace("github.com", "api.github.com/repos");
                 var page = 1;
                 var commitCount = 0;
                 while (true)
                 {
                     var url = new Uri($"{newLocation}/commits?per_page=100&page={page}");
-                    client.DefaultRequestHeaders.TryAddWithoutValidation("Accept",  "application/json");
+                    client.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "application/json");
+                    client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "RplaceModtools");
+                    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken.AccessToken);
                     var response = await client.GetAsync(url);
                     client.DefaultRequestHeaders.Clear();
                     if (response is null || !response.IsSuccessStatusCode)
                     {
-                        Console.WriteLine("Failed to load git commits from github API, HTTP response was not okay");
+                        Console.WriteLine("Failed to load git commits from github API, HTTP response was not okay: "
+                            + await response?.Content.ReadAsStringAsync());
                         RemoveStateInfo(progressNotification);
                         return;
                     }
