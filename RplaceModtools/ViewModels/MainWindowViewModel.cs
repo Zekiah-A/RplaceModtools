@@ -77,8 +77,8 @@ public partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty] private ObservableCollection<ObservableObject> stateInfos = new();
     [ObservableProperty] public ObservableObject selectedStateInfo;
-    [ObservableProperty] private Bitmap? previewImageSource =
-        new(AssetLoader.Open(new Uri("avares://RplaceModtools/Assets/preview_default.png")));
+    [ObservableProperty] private Bitmap previewImageSource =
+        new Bitmap(AssetLoader.Open(new Uri("avares://RplaceModtools/Assets/preview_default.png")));
     [ObservableProperty] private bool startedAndConfigured;
     
     // Image canvas paste stuff
@@ -225,6 +225,9 @@ public partial class MainWindowViewModel : ObservableObject
         AddStateInfo(progressNotification);
         progressNotification.PersistsFor = TimeSpan.MaxValue;
         progressNotification.Notification = "Started loading canvas backup list...";
+        var nameMatches = RepositoryNameRegex().Match(CurrentPreset.BackupsRepository).Groups.Values.First();
+        var invalidChars = new string(Path.GetInvalidFileNameChars());
+        var safeRepositoryName = Regex.Replace(nameMatches.Value, $"[{Regex.Escape(invalidChars)}]", "_");
 
         if (CurrentPreset.LegacyServer)
         {
@@ -312,12 +315,42 @@ public partial class MainWindowViewModel : ObservableObject
                 }
 
                 // Pull commit hashes with API
-                var newLocation = CurrentPreset.BackupsRepository.Replace("github.com", "api.github.com/repos");
                 var page = 1;
                 var commitCount = 0;
+                var newLocation = CurrentPreset.BackupsRepository.Replace("github.com", "api.github.com/repos");
+                var cachePath = Path.Join(ProgramDirectory, safeRepositoryName + ".txt");
+                var cacheTempPath = cachePath + ".tmp";
+                var caches = new List<string>();
+                DateTime? cacheStartDate = null;
+                if (File.Exists(cachePath))
+                {
+                    using var cacheReader = new StreamReader(cachePath);
+                    while (await cacheReader.ReadLineAsync() is { } line)
+                    {
+                        // Invalid data
+                        if (string.IsNullOrEmpty(line))
+                        {
+                            continue;
+                        }
+                        // Metadata cache region
+                        if (cacheStartDate is null)
+                        {
+                            cacheStartDate = DateTime.Parse(line);
+                            continue;
+                        }
+                        // Add cache
+                        caches.Add(line);
+                    }
+                }
+                // To avoid duplicates from after cache skip (likely not aligned to current pages)
+                var newCommits = new List<string>();
+                DateTime? newCommitStartDate = null;
+                const int pageReadLength = 100;
+                
+                await using var tempStream = File.OpenWrite(cacheTempPath);
                 while (true)
                 {
-                    var url = new Uri($"{newLocation}/commits?per_page=100&page={page}");
+                    var url = new Uri($"{newLocation}/commits?per_page={pageReadLength}&page={page}");
                     client.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "application/json");
                     client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "RplaceModtools");
                     client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken.AccessToken);
@@ -330,33 +363,48 @@ public partial class MainWindowViewModel : ObservableObject
                         RemoveStateInfo(progressNotification);
                         return;
                     }
-                    var commits = await response.Content.ReadFromJsonAsync<GithubApiCommit[]>(jsonOptions);
+                    var commits = await response.Content.ReadFromJsonAsync<GithubApiCommitItem[]>(jsonOptions);
                     if (commits is null || commits.Length == 0)
                     {
                         break;
                     }
-                    else
-                    {
-                        foreach (var commit in commits)
-                        {
-                            progressNotification.Notification =
-                                $"Downloading canvas backups from github: {commitCount} commits";
-                            Backups.Add(commit.Sha);
-                        }
-                        page++;
-                    }
-                }
 
+                    foreach (var commit in commits)
+                    {
+                        // We are no longer reading new commits and have wandered into the caches
+                        var commitDate = commit.Commit.Committer.Date;
+                        if (DateTime.Parse(commitDate) < cacheStartDate)
+                        {
+                            goto FinishAndWrite;
+                        }
+                        if (newCommitStartDate is null)
+                        {
+                            newCommitStartDate = DateTime.Parse(commitDate);
+                            await tempStream.WriteAsync(Encoding.UTF8.GetBytes(newCommitStartDate + "\n"));
+                        }
+                        newCommits.Add(commit.Sha);
+                        await tempStream.WriteAsync(Encoding.UTF8.GetBytes(commit.Sha + "\n"));
+                        progressNotification.Notification =
+                            $"Downloading canvas backups from github: {commitCount} commits";
+                        commitCount++;
+                    }
+                    page++;
+                }
+                FinishAndWrite:
+                foreach (var cache in caches)
+                {
+                    await tempStream.WriteAsync(Encoding.UTF8.GetBytes(cache + "\n"));
+                }
+                await tempStream.FlushAsync();
+                File.Move(cacheTempPath, cachePath, true);
+                Backups.AddRange(newCommits);
+                Backups.AddRange(caches);
                 RemoveStateInfo(progressNotification);
                 return;
             }
 
             try
             {
-                var nameMatches = RepositoryNameRegex().Match(CurrentPreset.BackupsRepository).Groups.Values.First();
-                var invalidChars = new string(Path.GetInvalidFileNameChars());
-                var safeRepositoryName = Regex.Replace(nameMatches.Value, $"[{Regex.Escape(invalidChars)}]", "_");
-
                 var localPath = Path.Join(ProgramDirectory, safeRepositoryName);
                 // Clear up incomplete clones
                 if (Directory.Exists(localPath))
