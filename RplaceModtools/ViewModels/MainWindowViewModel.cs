@@ -15,7 +15,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using DynamicData;
 using LibGit2Sharp;
-using Timer =  System.Timers.Timer;
+using Timer = System.Timers.Timer;
 using Avalonia.Styling;
 using RplaceModtools.Views;
 using SkiaSharp;
@@ -25,6 +25,8 @@ using System.Web;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
 using System.Net.Http.Headers;
+using System.Runtime.CompilerServices;
+using Avalonia.Threading;
 
 namespace RplaceModtools.ViewModels;
 public partial class MainWindowViewModel : ObservableObject
@@ -117,7 +119,8 @@ public partial class MainWindowViewModel : ObservableObject
     private const int PresetVersion = 0;
     private readonly Dictionary<uint, uint> intIdPositions = new();
     private readonly Dictionary<uint, string> intIdNames = new();
-    private uint intId = 0;
+    private uint intId;
+    public uint Cooldown;
     private GithubAccessToken? accessToken;
 
     public MainWindowViewModel()
@@ -201,7 +204,7 @@ public partial class MainWindowViewModel : ObservableObject
         {
             var x = (int) (i % CanvasWidth);
             var y = (int) (i / CanvasWidth);
-            canvas.DrawPoint(x, y, PaletteViewModel.Colours.ElementAtOrDefault(placeFile[i]));
+            canvas.DrawPoint(x, y, paletteVm.PaletteColours.ElementAtOrDefault(placeFile[i]));
         });
         
         using var image = surface.Snapshot();
@@ -622,6 +625,7 @@ public partial class MainWindowViewModel : ObservableObject
                 Options = { KeepAliveInterval = TimeSpan.FromSeconds(5) }
             };
             wsClient.Options.SetRequestHeader("Origin", "https://rplace.live");
+            wsClient.Options.SetRequestHeader("User-Agent", "RplaceModtools");
             //wsClient.Options.SetRequestHeader("Cookies", tokenCookie);
             return wsClient;
         });
@@ -636,20 +640,17 @@ public partial class MainWindowViewModel : ObservableObject
             var code = msg.Binary[0];
             switch (code)
             {
+                case 0:
+                {
+                    // TODO: Slightly jank & cursed
+                    var newPalette = MemoryMarshal.Cast<byte, uint>(msg.Binary.AsSpan()[1..]).ToArray();
+                    Dispatcher.UIThread.Post(() => paletteVm.UpdatePalette(newPalette.ToArray()));
+                    break;
+                }
                 case 1:
                 {
                     // New server board info packet, superceedes packet 2, also used by old board for cooldown
-                    var cooldown = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan()[5..]);
-                    if (cooldown == 0xFFFFFFFF)
-                    {
-                        Console.ForegroundColor = ConsoleColor.DarkYellow;
-                        Console.WriteLine("Canvas is locked (readonly). Edits can not be made.");
-                        Console.ResetColor();
-                        var lockedNotification = App.Current.Services.GetRequiredService<NotificationStateInfoViewModel>();
-                        AddStateInfo(lockedNotification);
-                        lockedNotification.PersistsFor = TimeSpan.MaxValue;
-                        lockedNotification.Notification = "⚠ Warning: Server has notified that this canvas is locked. Edits can not be made.";
-                    }
+                    Cooldown = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan()[5..]);
 
                     // New server packs canvas width and height in code 1, making it 17, equivalent to packet 2
                     if (msg.Binary.Length == 17)
@@ -707,6 +708,27 @@ public partial class MainWindowViewModel : ObservableObject
                     var index = BinaryPrimitives.ReadUInt32BigEndian(data[1..]);
                     var colour = data[5];
                     BoardSetPixel(new Pixel(index, colour));
+                    break;
+                }
+                case 8: // Canvas restriction
+                {
+                    var locked = msg.Binary[1];
+                    var reason = Encoding.UTF8.GetString(msg.Binary[2..]);
+                    var lockedNotification = App.Current.Services.GetRequiredService<NotificationStateInfoViewModel>();
+                    AddStateInfo(lockedNotification);
+                    lockedNotification.PersistsFor = TimeSpan.FromSeconds(60);
+                    if (locked == 1)
+                    {
+                        lockedNotification.Notification = string.IsNullOrEmpty(reason)
+                            ? "⚠ Canvas locked: " + reason
+                            : "⚠ Warning: Server has notified that this canvas is locked. Edits can not be made.";
+                    }
+                    else
+                    {
+                        lockedNotification.Notification = string.IsNullOrEmpty(reason)
+                            ? "⚠ Canvas unlocked: " + reason
+                            : "⚠ Warning: Canvas unlocked by server. Edits can now be made.";
+                    }
                     break;
                 }
                 case 11:  // Client int ID
@@ -977,9 +999,10 @@ public partial class MainWindowViewModel : ObservableObject
             Console.WriteLine("ERROR: Currently you need to enable 'view selected area at canvas backup' in order to rollback.");
             return;
         }
-
+		
         foreach (var selection in Selections)
         {
+        	Console.WriteLine("Selection");
             Rollback((int) selection.TopLeft.X, (int) selection.TopLeft.Y, (int) selection.BottomRight.X - (int) selection.TopLeft.X, 
                 (int) selection.BottomRight.Y - (int) selection.TopLeft.Y, SelectionBoard);
         }        
@@ -991,6 +1014,7 @@ public partial class MainWindowViewModel : ObservableObject
         // TODO: Improve range checks here (even though server will likely fix regardless)
         if (regionWidth > 250 || regionHeight > 250 || x >= CanvasWidth || y >= CanvasHeight)
         {
+        	Console.WriteLine("ERROR: Selected region is larger than maximum allowed rollback size");
             return;
         }
         

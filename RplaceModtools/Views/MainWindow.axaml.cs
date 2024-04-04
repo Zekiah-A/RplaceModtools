@@ -238,13 +238,13 @@ public partial class MainWindow : Window
                     return;
                 }
                 
-                var pixelColour = PaletteViewModel.Colours[colourIndex];
+                var pixelColour = paletteVm.PaletteColours[colourIndex];
                 paletteVm.CurrentColour = (byte) colourIndex;
                 CursorIndicatorRectangle.Background = new SolidColorBrush(
                     new Color(pixelColour.Alpha, pixelColour.Red, pixelColour.Green, pixelColour.Blue));
                 return;
             }
-            if (viewModel.CurrentTool == Tool.Select && viewModel.CurrentSelection is not null)
+            if (viewModel is { CurrentTool: Tool.Select, CurrentSelection: not null })
             {
                 var mousePosition = MouseOverPixel(e);
                 if (viewModel.CurrentHandle == SelectionHandle.None)
@@ -330,12 +330,12 @@ public partial class MainWindow : Window
     //https://github.com/rslashplace2/rslashplace2.github.io/blob/1cc30a12f35a6b0938e538100d3337228087d40d/index.html#L531
     private void OnBackgroundWheelChanged(object? sender, PointerWheelEventArgs e)
     {
-        //Board.Left -= (float) (e.GetPosition(this).X - MainGrid.ColumnDefinitions[0].ActualWidth / 2) / 50;
-        //Board.Top -= (float) (e.GetPosition(this).Y - Height / 2) / 50;
+        Board.Left -= (float) (e.GetPosition(this).X - MainGrid.ColumnDefinitions[0].ActualWidth / 2) / 50;
+        Board.Top -= (float) (e.GetPosition(this).Y - Height / 2) / 50;
         //LookingAtPixel = new Point((float) e.GetPosition(Board).X * Board.Zoom, (float) e.GetPosition(Board).Y * Board.Zoom);
-        var pos = LookingAtPixel;
+        //var pos = LookingAtPixel;
         Board.Zoom += (float) e.Delta.Y / 10;
-        LookingAtPixel = pos;
+        //LookingAtPixel = pos;
     }
     
     private void OnResetCanvasViewPressed(object? sender, RoutedEventArgs e)
@@ -423,7 +423,7 @@ public partial class MainWindow : Window
         {
             while (brushStack.Count > 0)
             {
-                Task.Delay(30);
+                Task.Delay((int) viewModel.Cooldown);
                 if (viewModel.Socket is { IsRunning: true })
                 {
                     viewModel.Socket.Send(brushStack.Pop().ToByteArray());

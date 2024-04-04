@@ -5,6 +5,7 @@ using Avalonia.Platform;
 using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
 using Avalonia.Threading;
+using Microsoft.Extensions.DependencyInjection;
 using RplaceModtools.Models;
 using RplaceModtools.ViewModels;
 using SkiaSharp;
@@ -30,7 +31,8 @@ public partial class SkCanvas : UserControl
     private Selection? currentSelection;
     private float canvZoom = 1;
     private SKPoint canvPosition = SKPoint.Empty;
-    private List<SKPaint> paints = new();
+    private List<SKPaint> paints = [];
+    private PaletteViewModel paletteVm;
     
     public static readonly DirectProperty<SkCanvas, byte[]?> BoardProperty =
         AvaloniaProperty.RegisterDirect<SkCanvas, byte[]?>(nameof(Board),
@@ -71,8 +73,7 @@ public partial class SkCanvas : UserControl
         AvaloniaProperty.RegisterDirect<SkCanvas, SelectionHandle>(nameof(SelectionBoard),
             instance => instance.currentHandle,
             (instance, value) => instance.currentHandle = value);
-
-
+    
     // Binding redraw triggering control properties 
     public byte[]? Board
     {
@@ -183,13 +184,16 @@ public partial class SkCanvas : UserControl
     public SkCanvas()
     {
         InitializeComponent();
-        
         ClipToBounds = true;
-        foreach (var col in PaletteViewModel.Colours)
+
+        // Get correct palette data for rendering colours (slightly cursed)
+        paletteVm = App.Current.Services.GetRequiredService<PaletteViewModel>();
+        foreach (var colour in paletteVm.PaletteColours)
         {
-            paints.Add(new SKPaint { Color = col });
+            paints.Add(new SKPaint { Color = colour });
         }
     }
+
 
     private class CustomDrawOp : ICustomDrawOperation
     {
@@ -229,12 +233,12 @@ public partial class SkCanvas : UserControl
                 for (var i = 0; i < Math.Min(parent.Board.Length, parent.CanvasWidth * parent.CanvasHeight); i++)
                 {
                     var colourI = parent.Board[i];
-                    if (colourI < PaletteViewModel.Colours.Length)
+                    if (colourI < parent.paletteVm.PaletteColours.Length)
                     {
                         img.SetPixel(
                             (int)(i % parent.CanvasWidth),
                             (int)(i / parent.CanvasWidth),
-                            PaletteViewModel.Colours[colourI]);
+                            parent.paletteVm.PaletteColours[colourI]);
                     }
                 }
 
@@ -247,12 +251,12 @@ public partial class SkCanvas : UserControl
                 using var img = new SKBitmap(canvasWidth, canvasHeight);
                 for (var i = 0; i < Math.Min(parent.Changes.Length, canvasWidth * canvasHeight); i++)
                 {
-                    if (parent.Changes[i] == 0 || parent.Changes[i] > PaletteViewModel.Colours.Length - 1)
+                    if (parent.Changes[i] == 0 || parent.Changes[i] > parent.paletteVm.PaletteColours.Length - 1)
                     {
                         continue;
                     }
                     img.SetPixel((int)(i % parent.CanvasWidth), (int)(i / parent.CanvasWidth),
-                        PaletteViewModel.Colours[parent.Changes[i]]);
+                        parent.paletteVm.PaletteColours[parent.Changes[i]]);
                 }
                 
                 parent.changesCache = SKImage.FromBitmap(img);
@@ -287,7 +291,9 @@ public partial class SkCanvas : UserControl
                 for (var c = 0; c < parent.socketPixels.Length; c++)
                 {
                     if (parent.socketPixels[c] == 255) continue;
-                    canvas.DrawRect(c % parent.CanvasWidth, c / parent.CanvasWidth, 1, 1, parent.paints[parent.socketPixels[c]]);
+                    canvas.DrawRect(c % parent.CanvasWidth,
+                        c / parent.CanvasWidth,
+                        1, 1, parent.paints[parent.socketPixels[c]]);
                 }
             }
             
@@ -299,7 +305,8 @@ public partial class SkCanvas : UserControl
                 {
                     for (var i = 0; i < parent.SelectionBoard.Length; i++)
                     {
-                        //TODO: This method is not fully efficient and only attempting to draw at all within the selection bounds would be better.
+                        // TODO: This method is not fully efficient and only attempting to draw at all within the selection bounds would be better.
+                        // TODO: CPU rendering sucks, possibly move to GPU rendering?
                         foreach (var sel in parent.Selections)
                         {
                             if (drawnPixel)
@@ -312,7 +319,10 @@ public partial class SkCanvas : UserControl
                                 && i / parent.CanvasHeight >= sel.TopLeft.Y
                                 && i / parent.CanvasHeight <= sel.BottomRight.Y)
                             {
-                                img.SetPixel((int)(i % parent.CanvasWidth), (int)(i / parent.CanvasWidth), PaletteViewModel.Colours[parent.SelectionBoard[i]]);
+                                img.SetPixel(
+                                    (int)(i % parent.CanvasWidth), 
+                                    (int)(i / parent.CanvasWidth),
+                                    parent.paletteVm.PaletteColours[parent.SelectionBoard[i]]);
                                 drawnPixel = true;
                             }
                         }

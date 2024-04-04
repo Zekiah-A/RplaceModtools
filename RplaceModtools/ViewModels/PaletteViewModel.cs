@@ -11,10 +11,11 @@ public partial class PaletteViewModel : ObservableObject
 {
     [ObservableProperty] private byte? currentColour;
 
-    [ObservableProperty] private ObservableCollection<IBrush> avColours =
-        new(Colours.Select(item => new SolidColorBrush(new Color(255, item.Red, item.Green, item.Blue))));   
+    [ObservableProperty] private ObservableCollection<IBrush> avColours = [];
 
-    public static readonly SKColor[] Colours =
+    public SKColor[] PaletteColours;
+
+    private static readonly SKColor[] defaultColours =
     {
         new(109, 0, 26),
         new(190, 0, 57),
@@ -49,4 +50,34 @@ public partial class PaletteViewModel : ObservableObject
         new(212, 215, 217),
         new(255, 255, 255)
     };
+
+    public PaletteViewModel()
+    {
+    	GenerateAvColours(defaultColours);
+	    PaletteColours = defaultColours;
+    }
+      
+    private void GenerateAvColours(IEnumerable<SKColor> colours)
+    {
+        AvColours.Clear();
+	    foreach (var colour in colours)
+	    {
+		    AvColours.Add(new SolidColorBrush(new Color(255, colour.Red, colour.Green, colour.Blue)));
+	    }
+    }
+
+    public void UpdatePalette(uint[] newPalette)
+    {
+    	var colours = newPalette.Select(colourInt =>
+    		{
+			    var alpha = (byte) ((colourInt >> 24) & 255);
+			    var blue = (byte) ((colourInt >> 16) & 255);
+			    var green = (byte) ((colourInt >> 8) & 255);
+			    var red = (byte) (colourInt & 255);
+    			return new SKColor(red, green, blue, alpha);
+    		});
+	    var skColors = colours as SKColor[] ?? colours.ToArray();
+	    GenerateAvColours(skColors);
+	    PaletteColours = skColors;
+    }
 }
