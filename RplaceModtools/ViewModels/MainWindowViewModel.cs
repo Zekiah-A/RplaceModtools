@@ -94,6 +94,7 @@ public partial class MainWindowViewModel : ObservableObject
     // Github code panel
     [ObservableProperty] private bool githubCodePanelVisible;
     [ObservableProperty] private string? githubCode;
+    private bool githubCodeAuthCancelled = false;
 
     public string[] KnownWebsockets => new[]
     {
@@ -287,7 +288,7 @@ public partial class MainWindowViewModel : ObservableObject
                     // 3 - Test authorisation
                     var tries = 1;
                     var authStart = DateTime.Now;
-                    while ((DateTime.Now - authStart).TotalSeconds < code.ExpiresIn)
+                    while ((DateTime.Now - authStart).TotalSeconds < code.ExpiresIn && !githubCodeAuthCancelled)
                     {
                         var accessRequestObject = new GithubAccessRequest(GithubClientId, code.DeviceCode, "urn:ietf:params:oauth:grant-type:device_code");
                         var accessRequestContent = JsonContent.Create(accessRequestObject, jsonHeaderValue, jsonOptions);
@@ -316,13 +317,9 @@ public partial class MainWindowViewModel : ObservableObject
                         tries++;
                     }
                 }
-
-                // Pull commit hashes with API
-                var page = 1;
-                var commitCount = 0;
-                var newLocation = CurrentPreset.BackupsRepository.Replace("github.com", "api.github.com/repos");
+                
+                // Load canvas commit hashes from locally saved caches file
                 var cachePath = Path.Join(ProgramDirectory, safeRepositoryName + ".txt");
-                var cacheTempPath = cachePath + ".tmp";
                 var caches = new List<string>();
                 DateTime? cacheStartDate = null;
                 if (File.Exists(cachePath))
@@ -345,62 +342,71 @@ public partial class MainWindowViewModel : ObservableObject
                         caches.Add(line);
                     }
                 }
-                // To avoid duplicates from after cache skip (likely not aligned to current pages)
-                var newCommits = new List<string>();
-                DateTime? newCommitStartDate = null;
-                const int pageReadLength = 100;
-                
-                await using var tempStream = File.OpenWrite(cacheTempPath);
-                while (true)
-                {
-                    var url = new Uri($"{newLocation}/commits?per_page={pageReadLength}&page={page}");
-                    client.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "application/json");
-                    client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "RplaceModtools");
-                    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken.AccessToken);
-                    var response = await client.GetAsync(url);
-                    client.DefaultRequestHeaders.Clear();
-                    if (response is null || !response.IsSuccessStatusCode)
-                    {
-                        Console.WriteLine("Failed to load git commits from github API, HTTP response was not okay: "
-                            + await response?.Content.ReadAsStringAsync());
-                        RemoveStateInfo(progressNotification);
-                        return;
-                    }
-                    var commits = await response.Content.ReadFromJsonAsync<GithubApiCommitItem[]>(jsonOptions);
-                    if (commits is null || commits.Length == 0)
-                    {
-                        break;
-                    }
 
-                    foreach (var commit in commits)
-                    {
-                        // We are no longer reading new commits and have wandered into the caches
-                        var commitDate = commit.Commit.Committer.Date;
-                        if (DateTime.Parse(commitDate) < cacheStartDate)
-                        {
-                            goto FinishAndWrite;
-                        }
-                        if (newCommitStartDate is null)
-                        {
-                            newCommitStartDate = DateTime.Parse(commitDate);
-                            await tempStream.WriteAsync(Encoding.UTF8.GetBytes(newCommitStartDate + "\n"));
-                        }
-                        newCommits.Add(commit.Sha);
-                        await tempStream.WriteAsync(Encoding.UTF8.GetBytes(commit.Sha + "\n"));
-                        progressNotification.Notification =
-                            $"Downloading canvas backups from github: {commitCount} commits";
-                        commitCount++;
-                    }
-                    page++;
-                }
-                FinishAndWrite:
-                foreach (var cache in caches)
+                if (!githubCodeAuthCancelled)
                 {
-                    await tempStream.WriteAsync(Encoding.UTF8.GetBytes(cache + "\n"));
+                    // Pull commit hashes with API - first save to a tmp file, then merge with existing commit hashes
+                    var page = 1;
+                    var commitCount = 0;
+                    var newLocation = CurrentPreset.BackupsRepository.Replace("github.com", "api.github.com/repos");
+                    // To avoid duplicates from after cache skip (likely not aligned to current pages)
+                    var cacheTempPath = cachePath + ".tmp";
+                    var newCommits = new List<string>();
+                    DateTime? newCommitStartDate = null;
+                    const int pageReadLength = 100;
+                    
+                    await using var tempStream = File.OpenWrite(cacheTempPath);
+                    while (true)
+                    {
+                        var url = new Uri($"{newLocation}/commits?per_page={pageReadLength}&page={page}");
+                        client.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "application/json");
+                        client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "RplaceModtools");
+                        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken.AccessToken);
+                        var response = await client.GetAsync(url);
+                        client.DefaultRequestHeaders.Clear();
+                        if (response is null || !response.IsSuccessStatusCode)
+                        {
+                            Console.WriteLine("Failed to load git commits from github API, HTTP response was not okay: "
+                                + await response?.Content.ReadAsStringAsync());
+                            RemoveStateInfo(progressNotification);
+                            return;
+                        }
+                        var commits = await response.Content.ReadFromJsonAsync<GithubApiCommitItem[]>(jsonOptions);
+                        if (commits is null || commits.Length == 0)
+                        {
+                            break;
+                        }
+
+                        foreach (var commit in commits)
+                        {
+                            // We are no longer reading new commits and have wandered into the caches
+                            var commitDate = commit.Commit.Committer.Date;
+                            if (DateTime.Parse(commitDate) < cacheStartDate)
+                            {
+                                goto FinishAndWrite;
+                            }
+                            if (newCommitStartDate is null)
+                            {
+                                newCommitStartDate = DateTime.Parse(commitDate);
+                                await tempStream.WriteAsync(Encoding.UTF8.GetBytes(newCommitStartDate + "\n"));
+                            }
+                            newCommits.Add(commit.Sha);
+                            await tempStream.WriteAsync(Encoding.UTF8.GetBytes(commit.Sha + "\n"));
+                            progressNotification.Notification =
+                                $"Downloading canvas backups from github: {commitCount} commits";
+                            commitCount++;
+                        }
+                        page++;
+                    }
+                    FinishAndWrite:
+                    foreach (var cache in caches)
+                    {
+                        await tempStream.WriteAsync(Encoding.UTF8.GetBytes(cache + "\n"));
+                    }
+                    await tempStream.FlushAsync();
+                    File.Move(cacheTempPath, cachePath, true);
+                    Backups.AddRange(newCommits);
                 }
-                await tempStream.FlushAsync();
-                File.Move(cacheTempPath, cachePath, true);
-                Backups.AddRange(newCommits);
                 Backups.AddRange(caches);
                 RemoveStateInfo(progressNotification);
                 return;
@@ -788,10 +794,10 @@ public partial class MainWindowViewModel : ObservableObject
                         // TODO: Handle reactions
                         
                         var channelL = msg.Binary[offset++];
-                        var channelName = Encoding.UTF8.GetString(msg.Binary, offset, channelL);
+                        var channelCode = Encoding.UTF8.GetString(msg.Binary, offset, channelL);
                         offset += channelL;
                         var channelViewModel = liveChatVm.Channels
-                            .FirstOrDefault(channel => channel.ChannelName == channelName);
+                            .FirstOrDefault(channel => channel.ChannelCode == channelCode);
                         
                         if (msg.Binary.Length - offset >= 4)
                         {
@@ -802,7 +808,7 @@ public partial class MainWindowViewModel : ObservableObject
                         
                         if (channelViewModel is null)
                         {
-                            channelViewModel = new LiveChatChannelViewModel(channelName);
+                            channelViewModel = new LiveChatChannelViewModel(channelCode);
                             liveChatVm.Channels.Add(channelViewModel);
                         }
 
@@ -825,18 +831,27 @@ public partial class MainWindowViewModel : ObservableObject
                 }
             }
         });
-        Socket.DisconnectionHappened.Subscribe(info => Console.WriteLine("Disconnected from {0}, {1}", uri, info.Exception));
+        Socket.DisconnectionHappened.Subscribe(info =>
+        {
+            var disconnectNotification = App.Current.Services.GetRequiredService<NotificationStateInfoViewModel>();
+            disconnectNotification.PersistsFor = TimeSpan.FromSeconds(20);
+            disconnectNotification.Notification = "Disconnected from server... Modtools may need a restart to continue.";
+            AddStateInfo(disconnectNotification);
+            Console.WriteLine("Disconnected from server: {0}", info.Exception);
+        });
         
         await Socket.Start();
     }
 
-    // Decompress changes so it can be put onto canv
+    // Decompress changes so it can be put onto canvas
     private byte[] RunLengthChanges(Span<byte> data)
     {
         var i = 0;
         var changeI = 0;
         var changes = new byte[(int) (CanvasWidth * CanvasHeight)];
-
+        // 255 specifies a transparent (blank) pixel (so that you can see through to board layer)
+        Array.Fill(changes, (byte) 255);
+        
         while (i < data.Length)
         {
             var cell = data[i++];
@@ -899,6 +914,13 @@ public partial class MainWindowViewModel : ObservableObject
         }
 
         return false;
+    }
+
+    [RelayCommand]
+    private void CancelGithubCodeAuth()
+    {
+        GithubCodePanelVisible = false;
+        githubCodeAuthCancelled = true;
     }
 
     [RelayCommand]

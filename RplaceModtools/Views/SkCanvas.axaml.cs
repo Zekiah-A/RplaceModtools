@@ -25,7 +25,6 @@ public partial class SkCanvas : UserControl
     private byte[]? board = null;
     private byte[]? changes = null;
     private byte[]? selectionBoard = null;
-    private SKImage? changesCache;
     private SKImage? selectionCanvasCache;
     private byte[]? socketPixels;
 
@@ -36,7 +35,9 @@ public partial class SkCanvas : UserControl
     private PaletteViewModel paletteVm;
     private SKRuntimeEffect boardEffect;
     private SKShader? boardShader;
-    
+    private SKShader? changesShader;
+    private SKBitmap? socketPixelsBitmap;
+
     public static readonly DirectProperty<SkCanvas, byte[]?> BoardProperty =
         AvaloniaProperty.RegisterDirect<SkCanvas, byte[]?>(nameof(Board),
             instance => instance.Board,
@@ -97,7 +98,10 @@ public partial class SkCanvas : UserControl
         get => changes;
         set
         {
-            changesCache = null;
+            if (value is not null)
+            {
+                changesShader = BindBoardEffect(value);
+            }
             SetAndRaise(ChangesProperty, ref changes, value);
             Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
         }
@@ -201,47 +205,50 @@ public partial class SkCanvas : UserControl
         boardEffect = CreateBoardEffect();
     }
 
-    private SKShader BindBoardEffect(byte[] board)
+    private SKShader BindBoardEffect(byte[] boardData)
     {
         var boardInfo = new SKImageInfo((int)canvasWidth, (int)canvasHeight, SKColorType.Alpha8, SKAlphaType.Opaque);
-        var boardTex = SKImage.FromPixelCopy(boardInfo, board);
+        var boardTex = SKImage.FromPixelCopy(boardInfo, boardData);
+        if (boardTex is null)
+        {
+            throw new NullReferenceException("Could not create bind board effect, boardTex was null");
+        }
         var boardTexShader = boardTex.ToShader();
 
         // Cursed force interpret case as raw byte array
-        var paletteLength = paletteVm.PaletteColours.Length;
-        var paletteByteCount = paletteLength * sizeof(uint);
+        var paletteLength = paletteVm.PaletteData.Length;
+        var paletteByteCount = paletteLength * sizeof(int);
         var paletteData = new byte[paletteByteCount];
-        Buffer.BlockCopy(paletteVm.PaletteColours, 0, paletteData, 0, paletteByteCount);
+        Buffer.BlockCopy(paletteVm.PaletteData, 0, paletteData, 0, paletteByteCount);
         var paletteInfo = new SKImageInfo(paletteLength, 1, SKColorType.Rgba8888, SKAlphaType.Opaque);
         var paletteTex = SKImage.FromPixelCopy(paletteInfo, paletteData);
         if (paletteTex is null)
         {
-            throw new NullReferenceException("Could not bind board effect, paletteTex was null");
+            throw new NullReferenceException("Could not create bind board effect, paletteTex was null");
         }
         var paletteTexShader = paletteTex.ToShader();
 
         var children = new SKRuntimeEffectChildren(boardEffect)
         {
-            { "canvTex", boardTexShader },
+            { "boardTex", boardTexShader },
             { "paletteTex", paletteTexShader }
         };
         var uniforms = new SKRuntimeEffectUniforms(boardEffect);
-
         return boardEffect.ToShader(false, uniforms, children);
     }
 
     private SKRuntimeEffect CreateBoardEffect()
     {
         // GLSL code for your custom shader
-        var shaderSource = """
-            in fragmentProcessor canvTex;
+        const string shaderSource = """
+            in fragmentProcessor boardTex;
             in fragmentProcessor paletteTex;
-            half4 main(float2 uv)
+            half4 main(float2 texCoords)
             {
-                /*uint index = uint(sample(canvTex, uv).r);
-                half3 colour = sample(paletteTex, float2(index, 0.5)).rgb / 255.0;
-                return half4(colour, 1.0);*/
-                return half4(1.0, 1.0, 1.0, 1.0);
+                float index = sample(boardTex, texCoords).a;
+                float paletteIndex = index * 255.0;
+                half3 colour = sample(paletteTex, float2(paletteIndex, 0)).rgb;
+                return half4(colour, uint(paletteIndex) == 255 ? 0.0 : 1.0);
             }
         """;
         var effect = SKRuntimeEffect.Create(shaderSource, out var errors);
@@ -284,41 +291,24 @@ public partial class SkCanvas : UserControl
             canvas.Translate(parent.canvPosition.X, parent.canvPosition.Y);
 
             //Equivalent of renderAll
-            if (parent.board is not null && parent.boardShader is not null)
+            if (parent.board is not null || parent.changes is not null)
             {
-                using var surface = SKSurface.Create(new SKImageInfo((int)parent.canvasWidth, (int)parent.canvasHeight));
-                var boardPaint = new SKPaint
+                if (parent.boardShader is not null)
                 {
-                    Shader = parent.boardShader
-                };
-                surface.Canvas.DrawPaint(boardPaint);
-                canvas.DrawImage(surface.Snapshot(), 0, 0);
-            }
-            /*if (parent.changesCache is null && parent.Changes is not null)
-            {
-                var canvasWidth = (int) parent.CanvasWidth;
-                var canvasHeight = (int) parent.CanvasHeight;
-                using var img = new SKBitmap(canvasWidth, canvasHeight);
-                for (var i = 0; i < Math.Min(parent.Changes.Length, canvasWidth * canvasHeight); i++)
-                {
-                    if (parent.Changes[i] == 0 || parent.Changes[i] > parent.paletteVm.PaletteColours.Length - 1)
-                    {
-                        continue;
-                    }
-                    img.SetPixel((int)(i % parent.CanvasWidth), (int)(i / parent.CanvasWidth),
-                        parent.paletteVm.PaletteColours[parent.Changes[i]]);
+                    using var boardPaint = new SKPaint();
+                    boardPaint.Shader = parent.boardShader;
+                    canvas.DrawRect(0, 0, parent.canvasWidth, parent.canvasHeight, boardPaint);
                 }
-                
-                parent.changesCache = SKImage.FromBitmap(img);
-            }
-                
-            if (parent.changesCache is not null)
-            {
-                canvas.DrawImage(parent.changesCache, 0, 0);
+                if (parent.changesShader is not null)
+                {
+                    using var changesPaint = new SKPaint();
+                    changesPaint.Shader = parent.changesShader;
+                    canvas.DrawRect(0, 0, parent.canvasWidth, parent.canvasHeight, changesPaint);
+                }
             }
             else
             {
-                //Draw rplacetk logo background instead
+                //Draw rplace.live logo background instead
                 var bck = new SKPaint { Color = new SKColor(51, 51, 51, 100) };
                 var frg = new SKPaint { Color = new SKColor(255, 87, 0, 200) };
                 var dot = new SKPaint { Color = SKColors.Black };
@@ -331,15 +321,9 @@ public partial class SkCanvas : UserControl
             }
             
             // Draw all pixels that have come in to the canvas.
-            if (parent.socketPixels is not null)
+            if (parent.socketPixelsBitmap is not null)
             {
-                for (var c = 0; c < parent.socketPixels.Length; c++)
-                {
-                    if (parent.socketPixels[c] == 255) continue;
-                    canvas.DrawRect(c % parent.CanvasWidth,
-                        c / parent.CanvasWidth,
-                        1, 1, parent.paints[parent.socketPixels[c]]);
-                }
+                canvas.DrawImage(SKImage.FromBitmap(parent.socketPixelsBitmap), SKPoint.Empty);
             }
             
             if (parent.SelectionBoard is not null && parent.selectionCanvasCache is null)
@@ -425,7 +409,7 @@ public partial class SkCanvas : UserControl
                     canvas.DrawCircle(new SKPoint((float) sel.BottomRight.X, (float) sel.TopLeft.Y), 4, selHandlePoint);
                     canvas.DrawCircle(new SKPoint((float) sel.BottomRight.X, (float) sel.BottomRight.Y), 4, selHandlePoint);
                 }
-            }*/
+            }
             
             canvas.Flush();
             canvas.Restore();
@@ -490,10 +474,14 @@ public partial class SkCanvas : UserControl
         {
             socketPixels = new byte[CanvasWidth * CanvasHeight];
             Array.Fill(socketPixels, (byte) 255);
+            socketPixelsBitmap = new SKBitmap((int)CanvasWidth, (int)CanvasHeight, false);
         }
-
         if (pixel.Index < socketPixels.Length)
         {
+            socketPixelsBitmap?.SetPixel(
+                (int)(pixel.Index % canvasWidth),
+                (int)(pixel.Index / canvasHeight),
+                paletteVm.PaletteColours[pixel.Colour]);
             socketPixels[pixel.Index] = pixel.Colour;
             Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
         }

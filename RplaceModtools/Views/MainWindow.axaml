@@ -1,33 +1,18 @@
-<Window xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="using:RplaceModtools.ViewModels"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:views="clr-namespace:RplaceModtools.Views"
-        xmlns:rplaceModtools="clr-namespace:RplaceModtools"
-        xmlns:models="clr-namespace:RplaceModtools.Models"
-        mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="600" MinWidth="400"
-        x:Class="RplaceModtools.Views.MainWindow"
-        Icon="/Assets/favicon.ico"
-        Title="RplaceModtools"
-        TransparencyLevelHint="AcrylicBlur"
-        TransparencyBackgroundFallback="DarkGray"
-        Background="DarkGray"
-        RequestedThemeVariant="{Binding CurrentTheme}">
-        <!--Background="Transparent"-->
-        
+<?xml version="1.0"?>
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:RplaceModtools.ViewModels" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:views="clr-namespace:RplaceModtools.Views" xmlns:rplaceModtools="clr-namespace:RplaceModtools" xmlns:models="clr-namespace:RplaceModtools.Models" mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="600" MinWidth="400" x:Class="RplaceModtools.Views.MainWindow" Icon="/Assets/favicon.ico" Title="RplaceModtools" TransparencyLevelHint="AcrylicBlur" TransparencyBackgroundFallback="DarkGray" Background="DarkGray" RequestedThemeVariant="{Binding CurrentTheme}">
+    <!--Background="Transparent"-->
     <Window.Styles>
         <Style Selector="Image.PlaceLogo">
             <Setter Property="Height" Value="100"/>
             <Setter Property="Width" Value="100"/>
             <Style.Animations>
-                <Animation Delay="0:0:1" Duration="0:0:1" Easing="QuadraticEaseOut"> 
+                <Animation Delay="0:0:1" Duration="0:0:1" Easing="QuadraticEaseOut">
                     <KeyFrame Cue="0%">
-                        <Setter Property="Height" Value="140"></Setter>
+                        <Setter Property="Height" Value="140"/>
                         <Setter Property="Opacity" Value="0.0"/>
                     </KeyFrame>
                     <KeyFrame Cue="100%">
-                        <Setter Property="Height" Value="100"></Setter>
+                        <Setter Property="Height" Value="100"/>
                         <Setter Property="Opacity" Value="1.0"/>
                     </KeyFrame>
                 </Animation>
@@ -38,7 +23,7 @@
             <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="FontSize" Value="18"/>
             <Style.Animations>
-                <Animation Delay="0:0:2" Duration="0:0:1.5" Easing="QuadraticEaseOut"> 
+                <Animation Delay="0:0:2" Duration="0:0:1.5" Easing="QuadraticEaseOut">
                     <KeyFrame Cue="0%">
                         <Setter Property="Opacity" Value="0.0"/>
                     </KeyFrame>
@@ -50,14 +35,14 @@
         </Style>
         <Style Selector="StackPanel.PlaceConfig">
             <Style.Animations>
-                <Animation Delay="0:0:2" Duration="0:0:1.5" Easing="QuadraticEaseOut"> 
+                <Animation Delay="0:0:2" Duration="0:0:1.5" Easing="QuadraticEaseOut">
                     <KeyFrame Cue="0%">
                         <Setter Property="Opacity" Value="0.0"/>
-                        <Setter Property="Spacing" Value="20"></Setter>
+                        <Setter Property="Spacing" Value="20"/>
                     </KeyFrame>
                     <KeyFrame Cue="100%">
                         <Setter Property="Opacity" Value="1.0"/>
-                        <Setter Property="Spacing" Value="0"></Setter>
+                        <Setter Property="Spacing" Value="0"/>
                     </KeyFrame>
                 </Animation>
             </Style.Animations>
@@ -65,17 +50,25 @@
         <!-- TODO: Should use transition instead -->
         <Style Selector="Border.ToolsPanelOpen">
             <Style.Animations>
-                <Animation Duration="0:0:0.5" Easing="QuadraticEaseOut" FillMode="Forward"> 
-                    <KeyFrame Cue="0%"><Setter Property="Margin" Value="0"/></KeyFrame>
-                    <KeyFrame Cue="100%"><Setter Property="Margin" Value="0 0 -500 0"/></KeyFrame>
+                <Animation Duration="0:0:0.5" Easing="QuadraticEaseOut" FillMode="Forward">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="Margin" Value="0"/>
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="Margin" Value="0 0 -500 0"/>
+                    </KeyFrame>
                 </Animation>
             </Style.Animations>
         </Style>
         <Style Selector="Border.ToolsPanelClose">
             <Style.Animations>
-                <Animation Duration="0:0:0.5" Easing="QuadraticEaseOut" FillMode="Forward"> 
-                    <KeyFrame Cue="0%"><Setter Property="Margin" Value="0 0 -500 0"/> </KeyFrame>
-                    <KeyFrame Cue="100%"><Setter Property="Margin" Value="0"/></KeyFrame>
+                <Animation Duration="0:0:0.5" Easing="QuadraticEaseOut" FillMode="Forward">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="Margin" Value="0 0 -500 0"/>
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="Margin" Value="0"/>
+                    </KeyFrame>
                 </Animation>
             </Style.Animations>
         </Style>
@@ -109,24 +102,20 @@
             <Setter Property="FocusAdorner" Value="{x:Null}"/>
         </Style>
     </Window.Styles>
-
     <Window.Resources>
         <rplaceModtools:NumericSignConverter x:Key="NumericSignConverter"/>
-        <rplaceModtools:HashColourConverter x:Key="HashColourConverter" />
-        <rplaceModtools:ValueEqualsConverter x:Key="ValueEqualsConverter" />
-        <rplaceModtools:ValueNotEqualsConverter x:Key="ValueNotEqualsConverter" />
+        <rplaceModtools:HashColourConverter x:Key="HashColourConverter"/>
+        <rplaceModtools:ValueEqualsConverter x:Key="ValueEqualsConverter"/>
+        <rplaceModtools:ValueNotEqualsConverter x:Key="ValueNotEqualsConverter"/>
         <rplaceModtools:AllTrueConverter x:Key="AllTrueConverter"/>
         <rplaceModtools:NotConverter x:Key="NotConverter"/>
     </Window.Resources>
-    
     <Design.DataContext>
-       <vm:MainWindowViewModel/>
+        <vm:MainWindowViewModel/>
     </Design.DataContext>
-    
-    <Grid ColumnDefinitions="*, Auto" x:Name="MainGrid"> <!--Height="508"-->
-        <Border Grid.Column="0" Grid.ColumnSpan="2" x:Name="PlaceConfigPanel" HorizontalAlignment="Center" VerticalAlignment="Center"
-                IsVisible="{Binding StartedAndConfigured, Converter={StaticResource NotConverter}}"
-                Width="380" Background="White" BoxShadow="0 0 20 2 Gray" CornerRadius="10" ZIndex="8">
+    <Grid ColumnDefinitions="*, Auto" x:Name="MainGrid">
+        <!--Height="508"-->
+        <Border Grid.Column="0" Grid.ColumnSpan="2" x:Name="PlaceConfigPanel" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding StartedAndConfigured, Converter={StaticResource NotConverter}}" Width="380" Background="White" BoxShadow="0 0 20 2 Gray" CornerRadius="10" ZIndex="8">
             <Grid RowDefinitions="*, Auto">
                 <StackPanel Grid.Row="0">
                     <Image Classes="PlaceLogo" Source="../Assets/favicon.png"/>
@@ -135,11 +124,10 @@
                         <TextBlock FontSize="24" Margin="0 0 0 5">Configuration:</TextBlock>
                         <AutoCompleteBox Watermark="Canvas websocket address" ItemsSource="{Binding KnownWebsockets}" Text="{Binding CurrentPreset.Websocket}" Margin="0 0 0 5"/>
                         <AutoCompleteBox Watermark="Place file server address" ItemsSource="{Binding KnownFileServers}" Text="{Binding CurrentPreset.FileServer}" Margin="0 0 0 5"/>
-                        <Button x:Name="PresetsAdvancedButton" HorizontalAlignment="Center" Margin="4" Click="OnPresetsAdvancedClicked">Advanced ▼</Button>
+                        <Button x:Name="PresetsAdvancedButton" HorizontalAlignment="Center" Margin="4" Click="OnPresetsAdvancedClicked">Advanced &#x25BC;</Button>
                         <StackPanel x:Name="PresetsAdvancedPanel" IsVisible="false" Spacing="5">
                             <ToggleSwitch IsChecked="{Binding CurrentPreset.LegacyServer, Mode=TwoWay}">Legacy server</ToggleSwitch>
-                            <TextBox Watermark="Live canvas path" Text="{Binding CurrentPreset.PlacePath}" />
-                            
+                            <TextBox Watermark="Live canvas path" Text="{Binding CurrentPreset.PlacePath}"/>
                             <TextBox Watermark="Server backups repository" Text="{Binding CurrentPreset.BackupsRepository}">
                                 <TextBox.IsVisible>
                                     <Binding Path="CurrentPreset.LegacyServer" Converter="{StaticResource ValueEqualsConverter}">
@@ -184,11 +172,11 @@
                             <ListBox ItemsSource="{Binding ServerPresets}" SelectedItem="{Binding CurrentPreset}">
                                 <ListBox.Styles>
                                     <Style Selector="ListBox">
-                                        <Setter Property="Background" Value="Transparent"></Setter>
+                                        <Setter Property="Background" Value="Transparent"/>
                                     </Style>
                                     <Style Selector="ListBoxItem">
                                         <Style.Animations>
-                                            <Animation Delay="0:0:3" Duration="0:0:2" Easing="QuadraticEaseOut"> 
+                                            <Animation Delay="0:0:3" Duration="0:0:2" Easing="QuadraticEaseOut">
                                                 <KeyFrame Cue="0%">
                                                     <Setter Property="Opacity" Value="0.0"/>
                                                 </KeyFrame>
@@ -197,7 +185,7 @@
                                                 </KeyFrame>
                                             </Animation>
                                         </Style.Animations>
-                                        <Setter Property="Padding" Value="4" />
+                                        <Setter Property="Padding" Value="4"/>
                                         <Setter Property="MinWidth" Value="72"/>
                                         <Setter Property="MinHeight" Value="72"/>
                                         <Setter Property="Margin" Value="2"/>
@@ -205,17 +193,17 @@
                                         <Setter Property="Background" Value="{DynamicResource ButtonBackground}"/>
                                     </Style>
                                     <Style Selector="TextBlock.ServerPresetHeader">
-                                        <Setter Property="FontSize" Value="36" />
-                                        <Setter Property="TextAlignment" Value="Center" />
-                                        <Setter Property="Canvas.Left" Value="0" />
+                                        <Setter Property="FontSize" Value="36"/>
+                                        <Setter Property="TextAlignment" Value="Center"/>
+                                        <Setter Property="Canvas.Left" Value="0"/>
                                     </Style>
                                     <Style Selector="TextBlock.ServerPresetHeader:pointerover">
-                                        <Setter Property="Canvas.Left" Value="{Binding RelativeSource={RelativeSource Self}, Path=DesiredSize.Width, Converter={StaticResource NumericSignConverter}}" />
+                                        <Setter Property="Canvas.Left" Value="{Binding RelativeSource={RelativeSource Self}, Path=DesiredSize.Width, Converter={StaticResource NumericSignConverter}}"/>
                                     </Style>
                                 </ListBox.Styles>
                                 <ListBox.ItemsPanel>
                                     <ItemsPanelTemplate>
-                                        <UniformGrid Rows="2" Columns="4" />
+                                        <UniformGrid Rows="2" Columns="4"/>
                                     </ItemsPanelTemplate>
                                 </ListBox.ItemsPanel>
                                 <ListBox.ItemTemplate>
@@ -230,7 +218,7 @@
                                                     </TextBlock.Transitions>
                                                 </TextBlock>
                                             </Canvas>
-                                            <TextBlock Padding="0 36 0 0" Text="{Binding AdminKey}" />
+                                            <TextBlock Padding="0 36 0 0" Text="{Binding AdminKey}"/>
                                         </StackPanel>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
@@ -241,48 +229,38 @@
                 <Button Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Bottom" CornerRadius="5" Padding="40 10 40 10" Margin="5" Command="{Binding StartCommand}">Start</Button>
             </Grid>
         </Border>
-
         <!--Github code -->
         <Border Grid.Column="0" Grid.ColumnSpan="2" x:Name="GithubCodePanel" IsVisible="{Binding GithubCodePanelVisible, Mode=OneWay}" HorizontalAlignment="Center" VerticalAlignment="Center" Width="380" Background="White" BorderBrush="Gray" BorderThickness="1" CornerRadius="8" ZIndex="8">
             <StackPanel Margin="8" Spacing="4">
                 <TextBlock FontWeight="Bold">Github code:</TextBlock>
-                <SelectableTextBlock FontSize="36" FontWeight="Bold" Text="{Binding GithubCode}"></SelectableTextBlock>
+                <SelectableTextBlock FontSize="36" FontWeight="Bold" Text="{Binding GithubCode}"/>
                 <TextBlock TextWrapping="Wrap" HorizontalAlignment="Stretch">Enter this code in the github instance opened in your browser to continue</TextBlock>
-                <Button Click="OnGithubCodeCancelClicked">Cancel</Button>
+                <Button Command="{Binding CancelGithubCodeAuthCommand}">Cancel</Button>
             </StackPanel>
         </Border>
-        
         <!--Image load config-->
         <Border Grid.Column="0" Grid.ColumnSpan="2" x:Name="ImageConfigPanel" IsVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Width="380" Background="White" BorderBrush="Gray" BorderThickness="1" CornerRadius="8" ZIndex="8">
             <StackPanel Margin="8" Spacing="4">
                 <TextBlock>Load image:</TextBlock>
                 <Grid ColumnDefinitions="* Auto">
-                    <TextBox Grid.Column="0" Watermark="From URL" x:Name="ImageUrl"></TextBox>
+                    <TextBox Grid.Column="0" Watermark="From URL" x:Name="ImageUrl"/>
                     <Button Grid.Column="1" Click="OnLoadImageFromUrlClicked">Load Image</Button>
                 </Grid>
                 <Button Click="OnLoadImageFromFileClicked">Select file</Button>
-                <TextBox Text="{Binding LoadImageStatus}"></TextBox>
-                <NumericUpDown Value="{Binding ImageWidth}" Minimum="0" Maximum="256"></NumericUpDown>
-                <NumericUpDown Value="{Binding ImageHeight}" Minimum="0" Maximum="256"></NumericUpDown>
-                <NumericUpDown Value="{Binding ImageX}" Minimum="0" Maximum="{Binding CanvasWidth}"></NumericUpDown>
-                <NumericUpDown Value="{Binding ImageY}" Minimum="0" Maximum="{Binding CanvasHeight}"></NumericUpDown>
-                <Image Source="{Binding ImagePreview}"></Image>
+                <TextBox Text="{Binding LoadImageStatus}"/>
+                <NumericUpDown Value="{Binding ImageWidth}" Minimum="0" Maximum="256"/>
+                <NumericUpDown Value="{Binding ImageHeight}" Minimum="0" Maximum="256"/>
+                <NumericUpDown Value="{Binding ImageX}" Minimum="0" Maximum="{Binding CanvasWidth}"/>
+                <NumericUpDown Value="{Binding ImageY}" Minimum="0" Maximum="{Binding CanvasHeight}"/>
+                <Image Source="{Binding ImagePreview}"/>
             </StackPanel>
         </Border>
-        
         <!--Mod actions-->
         <Border Grid.Column="0" Grid.ColumnSpan="2" x:Name="ActionConfigPanel" IsVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Width="380" Background="White" BorderBrush="Gray" BorderThickness="1" CornerRadius="8" ZIndex="8">
             <StackPanel Margin="8" Spacing="4">
                 <TextBlock FontSize="24">Manage user:</TextBlock>
-                <TextBox Text="{Binding CurrentModerationMessageId}"
-                    IsVisible="{Binding CurrentModerationAll,
-                        Converter={StaticResource NotConverter}}" Watermark="Player uid"></TextBox>
-                
-                <ToggleSwitch IsVisible="{Binding CurrentModerationAction,
-                    Converter={StaticResource ValueEqualsConverter},
-                    ConverterParameter = {x:Static rplaceModtools:ModerationAction.Captcha}, Mode=TwoWay}"
-                    IsChecked="{Binding CurrentModerationAll}">
-                    <!-- Long story
+                <TextBox Text="{Binding CurrentModerationMessageId}" IsVisible="{Binding CurrentModerationAll,                         Converter={StaticResource NotConverter}}" Watermark="Player uid"/>
+                <ToggleSwitch IsVisible="{Binding CurrentModerationAction,                     Converter={StaticResource ValueEqualsConverter},                     ConverterParameter = {x:Static rplaceModtools:ModerationAction.Captcha}, Mode=TwoWay}" IsChecked="{Binding CurrentModerationAll}"><!-- Long story
                     <ToggleSwitch.IsChecked>
                         <MultiBinding Converter="{StaticResource AllTrueConverter}">
                             <Binding Path="CurrentModerationAll" />
@@ -297,53 +275,33 @@
                 </ToggleSwitch>
                 <StackPanel>
                     <TextBlock FontWeight="Bold">Action:</TextBlock>
-                    <RadioButton IsChecked="{Binding CurrentModerationAction,
-                            Converter={StaticResource ValueEqualsConverter},
-                            ConverterParameter={x:Static rplaceModtools:ModerationAction.Delete}}"
-                        >Delete message</RadioButton>
-                    <RadioButton IsChecked="{Binding CurrentModerationAction,
-                            Converter={StaticResource ValueEqualsConverter},
-                            ConverterParameter={x:Static rplaceModtools:ModerationAction.Kick}}"
-                        >Kick</RadioButton>
-                    <RadioButton IsChecked="{Binding CurrentModerationAction,
-                            Converter={StaticResource ValueEqualsConverter},
-                            ConverterParameter = {x:Static rplaceModtools:ModerationAction.Mute}}"
-                        >Mute</RadioButton>
-                    <RadioButton IsChecked="{Binding CurrentModerationAction,
-                            Converter={StaticResource ValueEqualsConverter},
-                            ConverterParameter = {x:Static rplaceModtools:ModerationAction.Ban}}"
-                        >Ban</RadioButton>
-                    <RadioButton IsChecked="{Binding CurrentModerationAction,
-                            Converter={StaticResource ValueEqualsConverter},
-                            ConverterParameter = {x:Static rplaceModtools:ModerationAction.Captcha}}"
-                        >Captcha solve</RadioButton>
+                    <RadioButton IsChecked="{Binding CurrentModerationAction,                             Converter={StaticResource ValueEqualsConverter},                             ConverterParameter={x:Static rplaceModtools:ModerationAction.Delete}}">Delete message</RadioButton>
+                    <RadioButton IsChecked="{Binding CurrentModerationAction,                             Converter={StaticResource ValueEqualsConverter},                             ConverterParameter={x:Static rplaceModtools:ModerationAction.Kick}}">Kick</RadioButton>
+                    <RadioButton IsChecked="{Binding CurrentModerationAction,                             Converter={StaticResource ValueEqualsConverter},                             ConverterParameter = {x:Static rplaceModtools:ModerationAction.Mute}}">Mute</RadioButton>
+                    <RadioButton IsChecked="{Binding CurrentModerationAction,                             Converter={StaticResource ValueEqualsConverter},                             ConverterParameter = {x:Static rplaceModtools:ModerationAction.Ban}}">Ban</RadioButton>
+                    <RadioButton IsChecked="{Binding CurrentModerationAction,                             Converter={StaticResource ValueEqualsConverter},                             ConverterParameter = {x:Static rplaceModtools:ModerationAction.Captcha}}">Captcha solve</RadioButton>
                 </StackPanel>
                 <StackPanel>
                     <StackPanel.IsVisible>
                         <MultiBinding Converter="{StaticResource AllTrueConverter}">
-                            <Binding Path="CurrentModerationAction"
-                                 Converter="{StaticResource ValueNotEqualsConverter}"
-                                 ConverterParameter="{x:Static rplaceModtools:ModerationAction.Kick}">
+                            <Binding Path="CurrentModerationAction" Converter="{StaticResource ValueNotEqualsConverter}" ConverterParameter="{x:Static rplaceModtools:ModerationAction.Kick}">
                             </Binding>
-                            <Binding Path="CurrentModerationAction"
-                                     Converter="{StaticResource ValueNotEqualsConverter}"
-                                     ConverterParameter="{x:Static rplaceModtools:ModerationAction.Captcha}">
+                            <Binding Path="CurrentModerationAction" Converter="{StaticResource ValueNotEqualsConverter}" ConverterParameter="{x:Static rplaceModtools:ModerationAction.Captcha}">
                             </Binding>
                         </MultiBinding>
                     </StackPanel.IsVisible>
                     <TextBlock FontWeight="Bold">Duration (hours, minutes):</TextBlock>
-                    <TimePicker SelectedTime="{Binding CurrentModerationDuration}"></TimePicker>
+                    <TimePicker SelectedTime="{Binding CurrentModerationDuration}"/>
                 </StackPanel>
                 <StackPanel>
                     <TextBlock FontWeight="Bold">Reason:</TextBlock>
-                    <TextBox Watermark="Explanation*" MaxLength="300" Text="{Binding CurrentModerationReason}"></TextBox>
+                    <TextBox Watermark="Explanation*" MaxLength="300" Text="{Binding CurrentModerationReason}"/>
                 </StackPanel>
                 <Border Padding="8" Margin="4" CornerRadius="4">
                     <Border.Background>
-                        <SolidColorBrush Color="Gray" Opacity="0.5" />
+                        <SolidColorBrush Color="Gray" Opacity="0.5"/>
                     </Border.Background>
-                    
-                    <TextBlock FontStyle="Italic" TextWrapping="Wrap" Foreground="Yellow">⚠ All moderation actions are logged by the server and reports sent to all other staff. Follow the moderation rules. Do not abuse power.</TextBlock>
+                    <TextBlock FontStyle="Italic" TextWrapping="Wrap" Foreground="Yellow">&#x26A0; All moderation actions are logged by the server and reports sent to all other staff. Follow the moderation rules. Do not abuse power.</TextBlock>
                 </Border>
                 <Grid ColumnDefinitions="* 16 *">
                     <Button Grid.Column="0" HorizontalAlignment="Stretch" Click="OnActionConfigSubmitPressed">Submit</Button>
@@ -351,72 +309,66 @@
                 </Grid>
             </StackPanel>
         </Border>
-
         <Panel Grid.Column="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="CanvasBackground">
-            <Panel.Background><SolidColorBrush Opacity="0.8" Color="White" /></Panel.Background>
-            <views:SkCanvas x:Name="Board" Board="{Binding Board}" Changes="{Binding Changes}"
-                SelectionBoard="{Binding SelectionBoard}" CanvasWidth="{Binding CanvasWidth}"
-                CanvasHeight="{Binding CanvasHeight}" CurrentSelection="{Binding CurrentSelection}"
-                Selections="{Binding Selections}" CurrentHandle="{Binding CurrentHandle}"/>
-            
+            <Panel.Background>
+                <SolidColorBrush Opacity="0.8" Color="White"/>
+            </Panel.Background>
+            <views:SkCanvas x:Name="Board" Board="{Binding Board}" Changes="{Binding Changes}" SelectionBoard="{Binding SelectionBoard}" CanvasWidth="{Binding CanvasWidth}" CanvasHeight="{Binding CanvasHeight}" CurrentSelection="{Binding CurrentSelection}" Selections="{Binding Selections}" CurrentHandle="{Binding CurrentHandle}"/>
             <Canvas VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
                 <Border x:Name="CursorIndicatorRectangle" IsVisible="False" BorderBrush="Gray" CornerRadius="2" BorderThickness="1" Background="Transparent" Height="16" Width="16" Opacity="1"/>
             </Canvas>
-            
             <!--Change this border into just the listbox, put the border around each element-->
-                <ListBox Classes="StateInfo" ItemsSource="{Binding StateInfos}"
-                        SelectedItem="{Binding SelectedStateInfo}" VerticalAlignment="Top"
-                        HorizontalAlignment="Right" Margin="16" ClipToBounds="True">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <views:SkBlurBehind BlurRadius="10">
-                                <ContentPresenter Padding="4" Content="{Binding }">
+            <ListBox Classes="StateInfo" ItemsSource="{Binding StateInfos}" SelectedItem="{Binding SelectedStateInfo}" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="16" ClipToBounds="True">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <views:SkBlurBehind BlurRadius="10">
+                            <ContentPresenter Padding="4" Content="{Binding }">
                                 </ContentPresenter>
-                            </views:SkBlurBehind>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-
-                    <ListBox.Styles>
-                        <Style Selector="ListBoxItem">
-                            <Setter Property="Border.CornerRadius" Value="8"/>
-                            <Setter Property="Margin" Value="4"/>
-                            <Setter Property="Padding" Value="1" />
-                            <Setter Property="Background">
-                                <Setter.Value>
-                                    <SolidColorBrush Color="Gray" Opacity="0.4" />
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                        <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
-                            <Setter Property="Background">
-                                <Setter.Value>
-                                    <SolidColorBrush Color="Gray" Opacity="0.6" />
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                        <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
-                            <Setter Property="Background">
-                                <Setter.Value>
-                                    <SolidColorBrush Color="Gray" Opacity="0.6" />
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </ListBox.Styles>
-                </ListBox>
-
+                        </views:SkBlurBehind>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+                <ListBox.Styles>
+                    <Style Selector="ListBoxItem">
+                        <Setter Property="Border.CornerRadius" Value="8"/>
+                        <Setter Property="Margin" Value="4"/>
+                        <Setter Property="Padding" Value="1"/>
+                        <Setter Property="Background">
+                            <Setter.Value>
+                                <SolidColorBrush Color="Gray" Opacity="0.4"/>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                    <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+                        <Setter Property="Background">
+                            <Setter.Value>
+                                <SolidColorBrush Color="Gray" Opacity="0.6"/>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                    <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+                        <Setter Property="Background">
+                            <Setter.Value>
+                                <SolidColorBrush Color="Gray" Opacity="0.6"/>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListBox.Styles>
+            </ListBox>
             <Button ZIndex="3" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="10" Padding="10" Click="OnSelectColourClicked">Select Colour</Button>
             <DockPanel ZIndex="8" Dock="Bottom" Height="150" VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Background="White" IsVisible="False" x:Name="Palette">
                 <Grid RowDefinitions="* Auto">
                     <ScrollViewer Grid.Row="0">
                         <ListBox x:Name="PaletteListBox" ItemsSource="{Binding AvColours}" HorizontalAlignment="Stretch" VerticalAlignment="Top" SelectedIndex="{Binding CurrentColour}" Background="Transparent">
-                            <ListBox.DataContext><vm:PaletteViewModel/></ListBox.DataContext>
+                            <ListBox.DataContext>
+                                <vm:PaletteViewModel/>
+                            </ListBox.DataContext>
                             <ListBox.Styles>
                                 <Style Selector="ListBoxItem">
-                                    <Setter Property="Padding" Value="0" />
+                                    <Setter Property="Padding" Value="0"/>
                                 </Style>
                             </ListBox.Styles>
                             <ListBox.ItemsPanel>
-                                <ItemsPanelTemplate> 
+                                <ItemsPanelTemplate>
                                     <WrapPanel x:Name="PalettePanel" Orientation="Horizontal" Margin="10 16 10 0"/>
                                 </ItemsPanelTemplate>
                             </ListBox.ItemsPanel>
@@ -443,55 +395,31 @@
                             <ComboBox Margin="5" SelectedItem="{Binding CurrentBackup}" ItemsSource="{Binding Backups}" x:Name="CanvasDropdown">
                                 <ComboBox.ItemsPanel>
                                     <ItemsPanelTemplate>
-                                        <VirtualizingStackPanel></VirtualizingStackPanel>
+                                        <VirtualizingStackPanel/>
                                     </ItemsPanelTemplate>
                                 </ComboBox.ItemsPanel>
                                 <ToolTip.Tip>Select a previous backup of the canvas for viewing and rollback.</ToolTip.Tip>
                             </ComboBox>
                             <Panel Margin="5 0 5 0">
                                 <Image x:Name="PreviewImg" Source="{Binding PreviewImageSource}" RenderOptions.BitmapInterpolationMode="None"/>
-                                    <Grid ColumnDefinitions="Auto, Auto, *" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Background="White">
-                                        <Button Grid.Column="0" Margin="4" Command="{Binding NextBackupCommand}">Previous</Button>
-                                        <Button Grid.Column="1" Margin="4" Command="{Binding PreviousBackupCommand}">Next</Button>
-                                        <Button Grid.Column="2" x:Name="DownloadBtn" IsEnabled="{Binding StartedAndConfigured}" HorizontalAlignment="Right" Margin="4" Command="{Binding DownloadCanvasPreviewCommand}">Download</Button>
-                                    </Grid>
+                                <Grid ColumnDefinitions="Auto, Auto, *" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Background="White">
+                                    <Button Grid.Column="0" Margin="4" Command="{Binding NextBackupCommand}">Previous</Button>
+                                    <Button Grid.Column="1" Margin="4" Command="{Binding PreviousBackupCommand}">Next</Button>
+                                    <Button Grid.Column="2" x:Name="DownloadBtn" IsEnabled="{Binding StartedAndConfigured}" HorizontalAlignment="Right" Margin="4" Command="{Binding DownloadCanvasPreviewCommand}">Download</Button>
+                                </Grid>
                             </Panel>
                             <TextBlock FontSize="18">Tool modes:</TextBlock>
                             <Grid Margin="5" RowDefinitions="*, *" ColumnDefinitions="*, *">
-                                <ToggleButton x:Name="PaintTool" Command="{Binding SelectPaintToolCommand}" 
-                                              IsChecked="{Binding CurrentTool,
-                                                  Converter={StaticResource ValueEqualsConverter},
-                                                  ConverterParameter={x:Static models:Tool.PaintBrush}}"
-                                              Grid.Row="0" Grid.Column="0" HorizontalAlignment="Stretch" Margin="0 0 5 0">
-                                    <ToolTip.Tip>Easily and quickly perform drawing operations upon the canvas.</ToolTip.Tip>Paintbrush
+                                <ToggleButton x:Name="PaintTool" Command="{Binding SelectPaintToolCommand}" IsChecked="{Binding CurrentTool,                                                   Converter={StaticResource ValueEqualsConverter},                                                   ConverterParameter={x:Static models:Tool.PaintBrush}}" Grid.Row="0" Grid.Column="0" HorizontalAlignment="Stretch" Margin="0 0 5 0"><ToolTip.Tip>Easily and quickly perform drawing operations upon the canvas.</ToolTip.Tip>Paintbrush
                                 </ToggleButton>
-                                <ToggleButton IsEnabled="False" x:Name="RubberTool" Command="{Binding SelectRubberToolCommand}"
-                                              IsChecked="{Binding CurrentTool,
-                                                  Converter={StaticResource ValueEqualsConverter},
-                                                  ConverterParameter={x:Static models:Tool.Rubber}}"
-                                              Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" Margin="5 0 0 0">
-                                    <ToolTip.Tip>Erase areas of drawings with the paintbrush tool to the the canvas original state.</ToolTip.Tip>Rubber
+                                <ToggleButton IsEnabled="False" x:Name="RubberTool" Command="{Binding SelectRubberToolCommand}" IsChecked="{Binding CurrentTool,                                                   Converter={StaticResource ValueEqualsConverter},                                                   ConverterParameter={x:Static models:Tool.Rubber}}" Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" Margin="5 0 0 0"><ToolTip.Tip>Erase areas of drawings with the paintbrush tool to the the canvas original state.</ToolTip.Tip>Rubber
                                 </ToggleButton>
-                                <ToggleButton x:Name="SelectTool" Command="{Binding SelectSelectionToolCommand}"
-                                              IsChecked="{Binding CurrentTool,
-                                                  Converter={StaticResource ValueEqualsConverter},
-                                                  ConverterParameter={x:Static models:Tool.Select}}"
-                                              Grid.Row="1" Grid.Column="0" HorizontalAlignment="Stretch" Margin="0 5 5 0">
-                                    <ToolTip.Tip>Select an area of the canvas to view for rollback, or perform modifications on.</ToolTip.Tip>Select tool
+                                <ToggleButton x:Name="SelectTool" Command="{Binding SelectSelectionToolCommand}" IsChecked="{Binding CurrentTool,                                                   Converter={StaticResource ValueEqualsConverter},                                                   ConverterParameter={x:Static models:Tool.Select}}" Grid.Row="1" Grid.Column="0" HorizontalAlignment="Stretch" Margin="0 5 5 0"><ToolTip.Tip>Select an area of the canvas to view for rollback, or perform modifications on.</ToolTip.Tip>Select tool
                                 </ToggleButton>
-                                <ToggleButton x:Name="FIllTool" IsEnabled="False" Grid.Row="1" Grid.Column="1"
-                                              IsChecked="{Binding CurrentTool,
-                                                  Converter={StaticResource ValueEqualsConverter},
-                                                  ConverterParameter={x:Static models:Tool.Fill}}"
-                                              HorizontalAlignment="Stretch" Margin="5 5 0 0">
-                                    <ToolTip.Tip>Fill area of canvas with a desired colour using paint bucket fill.</ToolTip.Tip>Paint bucket fill
+                                <ToggleButton x:Name="FIllTool" IsEnabled="False" Grid.Row="1" Grid.Column="1" IsChecked="{Binding CurrentTool,                                                   Converter={StaticResource ValueEqualsConverter},                                                   ConverterParameter={x:Static models:Tool.Fill}}" HorizontalAlignment="Stretch" Margin="5 5 0 0"><ToolTip.Tip>Fill area of canvas with a desired colour using paint bucket fill.</ToolTip.Tip>Paint bucket fill
                                 </ToggleButton>
                             </Grid>
-                            <ToggleSwitch x:Name="ViewSelectedBackup"
-                                IsChecked="{Binding ViewSelectedBackupArea}"
-                                Command="{Binding ViewSelectedBackupCommand}"
-                                Margin="5">
-                                <ToolTip.Tip>
+                            <ToggleSwitch x:Name="ViewSelectedBackup" IsChecked="{Binding ViewSelectedBackupArea}" Command="{Binding ViewSelectedBackupCommand}" Margin="5"><ToolTip.Tip>
                                     By turning this on, instead of viewing the whole canvas as the backup, only the area
                                     within your selection would peek through to the backup, allowing for easier visualisations
                                     of your rollback.
@@ -499,14 +427,11 @@
                                 View selected area at backup
                             </ToggleSwitch>
                             <Grid ColumnDefinitions="* Auto Auto">
-                                <Button Grid.Column="0" Margin="5" HorizontalAlignment="Stretch" Command="{Binding RollbackSelectedAreaCommand}">
-                                    <ToolTip.Tip>Revert the selected area of the canvas to a previous date.</ToolTip.Tip>Rollback selected area
+                                <Button Grid.Column="0" Margin="5" HorizontalAlignment="Stretch" Command="{Binding RollbackSelectedAreaCommand}"><ToolTip.Tip>Revert the selected area of the canvas to a previous date.</ToolTip.Tip>Rollback selected area
                                 </Button>
-                                <Button Grid.Column="1" Margin="5" HorizontalAlignment="Stretch" Click="OnLoadLocalClicked">
-                                    <ToolTip.Tip>Load a place file from your local device for rollback</ToolTip.Tip>📂
+                                <Button Grid.Column="1" Margin="5" HorizontalAlignment="Stretch" Click="OnLoadLocalClicked"><ToolTip.Tip>Load a place file from your local device for rollback</ToolTip.Tip>&#x1F4C2;
                                 </Button>
-                                <Button Grid.Column="2" Margin="5" HorizontalAlignment="Stretch" Click="OnLoadImageClicked">
-                                    <ToolTip.Tip>Load an image from local device to be used for rollback</ToolTip.Tip>📂
+                                <Button Grid.Column="2" Margin="5" HorizontalAlignment="Stretch" Click="OnLoadImageClicked"><ToolTip.Tip>Load an image from local device to be used for rollback</ToolTip.Tip>&#x1F4C2;
                                 </Button>
                             </Grid>
                         </StackPanel>
@@ -514,30 +439,37 @@
                 </TabItem>
                 <TabItem Header="Live chat">
                     <Grid x:Name="LiveChatGridContainer" RowDefinitions="* Auto" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                        <Grid.DataContext><vm:LiveChatViewModel></vm:LiveChatViewModel></Grid.DataContext>
+                        <Grid.DataContext>
+                            <vm:LiveChatViewModel/>
+                        </Grid.DataContext>
                         <Grid.Styles>
                             <Style Selector="TabControl">
-                                <Setter Property="Padding" Value="0" />
+                                <Setter Property="Padding" Value="0"/>
+                            </Style>
+                            <Style Selector="TabItem">
+                                <Setter Property="Padding" Value="4 0 4 0"/>
+                                <Setter Property="MinHeight" Value="24"/>
                             </Style>
                         </Grid.Styles>
-                        <TabControl x:Name="LiveChatTabs" Grid.Row="0"  ItemsSource="{Binding Channels}" SelectedItem="{Binding CurrentChannel}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                            <TabControl.ItemTemplate> <!-- Header -->
+                        <TabControl x:Name="LiveChatTabs" Grid.Row="0" ItemsSource="{Binding Channels}" SelectedItem="{Binding CurrentChannel}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                            <TabControl.ItemTemplate>
+                                <!-- Header -->
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding ChannelName}" />
+                                    <TextBlock FontSize="16" Text="{Binding ChannelName}"/>
                                 </DataTemplate>
                             </TabControl.ItemTemplate>
-                            <TabControl.DataTemplates> <!-- Contents -->
+                            <TabControl.DataTemplates>
+                                <!-- Contents -->
                                 <DataTemplate DataType="{x:Type vm:LiveChatChannelViewModel}">
-                                    <ListBox ItemsSource="{Binding Messages}"
-                                            Background="Transparent">
+                                    <ListBox ItemsSource="{Binding Messages}" Background="Transparent">
                                         <ListBox.Styles>
                                             <Style Selector="ListBoxItem">
-                                                <Setter Property="Padding" Value="0" />
+                                                <Setter Property="Padding" Value="0"/>
                                             </Style>
                                         </ListBox.Styles>
                                         <ListBox.ItemsPanel>
                                             <ItemsPanelTemplate>
-                                                <VirtualizingStackPanel></VirtualizingStackPanel>
+                                                <VirtualizingStackPanel/>
                                             </ItemsPanelTemplate>
                                         </ListBox.ItemsPanel>
                                         <ListBox.ItemTemplate>
@@ -545,30 +477,27 @@
                                                 <StackPanel>
                                                     <StackPanel.Styles>
                                                         <Style Selector="StackPanel">
-                                                            <Setter Property="Cursor" Value="Hand" />
+                                                            <Setter Property="Cursor" Value="Hand"/>
                                                         </Style>
                                                     </StackPanel.Styles>
                                                     <StackPanel Orientation="Horizontal" Opacity="0.6" IsVisible="{Binding RepliesTo, Converter={x:Static ObjectConverters.IsNotNull}}">
-                                                        <Border CornerRadius="4 0 0 0" Background="Black" Width="3" VerticalAlignment="Stretch" />
-                                                        <Image Source="../Assets/reply.png" />
-                                                        <TextBlock FontWeight="Bold" FontStyle="Italic" Text="{Binding RepliesTo.Name, FallbackValue='??????'}" />
-                                                        <TextBlock FontWeight="Bold" FontStyle="Italic" Text="{Binding RepliesTo.Message, FallbackValue='Message could not be loaded'}" />
+                                                        <Border CornerRadius="4 0 0 0" Background="Black" Width="3" VerticalAlignment="Stretch"/>
+                                                        <Image Source="../Assets/reply.png"/>
+                                                        <TextBlock FontWeight="Bold" FontStyle="Italic" Text="{Binding RepliesTo.Name, FallbackValue='??????'}"/>
+                                                        <TextBlock FontWeight="Bold" FontStyle="Italic" Text="{Binding RepliesTo.Message, FallbackValue='Message could not be loaded'}"/>
                                                     </StackPanel>
                                                     <TextBlock TextWrapping="Wrap">
                                                         <TextBlock.ContextMenu>
                                                             <ContextMenu>
-                                                                <MenuItem Header="{Binding SenderIntId, StringFormat='Sender ID: {0}'}"></MenuItem>
-                                                                <MenuItem Header="{Binding MessageId, StringFormat='Message ID: {0}'}"></MenuItem>
-                                                                <MenuItem PointerPressed="OnKickChatterPressed"
-                                                                    Header="{Binding Name, StringFormat='Kick {0}'}" />
-                                                                <MenuItem PointerPressed="OnMuteChatterPressed"
-                                                                    Header="{Binding Name, StringFormat='Mute {0}'}" />
-                                                                <MenuItem Header="{Binding Name, StringFormat='Ban {0}'}" 
-                                                                    PointerPressed="OnBanChatterPressed" />
+                                                            <MenuItem Header="{Binding SenderIntId, StringFormat='Sender ID: {0}'}"/>
+                                                            <MenuItem Header="{Binding MessageId, StringFormat='Message ID: {0}'}"/>
+                                                            <MenuItem PointerPressed="OnKickChatterPressed" Header="{Binding Name, StringFormat='Kick {0}'}"/>
+                                                            <MenuItem PointerPressed="OnMuteChatterPressed" Header="{Binding Name, StringFormat='Mute {0}'}"/>
+                                                            <MenuItem Header="{Binding Name, StringFormat='Ban {0}'}" PointerPressed="OnBanChatterPressed"/>
                                                             </ContextMenu>
                                                         </TextBlock.ContextMenu>
-                                                        <Run FontWeight="Bold" Foreground="{Binding Name, Converter={StaticResource HashColourConverter}}" Text="{Binding Path=Name}" />
-                                                        <Run Text="{Binding Message}" />
+                                                        <Run FontWeight="Bold" Foreground="{Binding Name, Converter={StaticResource HashColourConverter}}" Text="{Binding Path=Name}"/>
+                                                        <Run Text="{Binding Message}"/>
                                                     </TextBlock>
                                                 </StackPanel>
                                             </DataTemplate>
@@ -576,9 +505,9 @@
                                     </ListBox>
                                 </DataTemplate>
                             </TabControl.DataTemplates>
-                        </TabControl>                 
+                        </TabControl>
                         <Grid Grid.Row="1" ColumnDefinitions="*, 4, Auto">
-                            <TextBox Grid.Column="0" x:Name="ChatInput" Watermark="Enter a message..." KeyDown="OnChatInputKeyDown"></TextBox>
+                            <TextBox Grid.Column="0" x:Name="ChatInput" Watermark="Enter a message..." KeyDown="OnChatInputKeyDown"/>
                             <Button Grid.Column="2" VerticalAlignment="Stretch" Click="OnChatSendPressed">Send</Button>
                         </Grid>
                     </Grid>

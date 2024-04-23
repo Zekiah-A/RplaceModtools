@@ -75,7 +75,6 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
-        // TODO: View should not actually have access to VM
         viewModel = App.Current.Services.GetRequiredService<MainWindowViewModel>();
         DataContext = viewModel;
         
@@ -160,10 +159,12 @@ public partial class MainWindow : Window
                     if (Math.Abs(viewModel.CurrentSelection.TopLeft.Y - mousePosition.Y) < handleClickRadius * Board.Zoom) // Tl handle
                     {
                         viewModel.CurrentHandle = SelectionHandle.TopLeft;
+                        Cursor = new Cursor(StandardCursorType.TopLeftCorner);
                     }
                     else if (Math.Abs(viewModel.CurrentSelection.BottomRight.Y - mousePosition.Y) < handleClickRadius * Board.Zoom) // Bl handle
                     {
                         viewModel.CurrentHandle = SelectionHandle.BottomLeft;
+                        Cursor = new Cursor(StandardCursorType.BottomLeftCorner);
                     }
                 }
                 else if (Math.Abs(viewModel.CurrentSelection.BottomRight.X - mousePosition.X) < handleClickRadius * Board.Zoom)
@@ -171,10 +172,12 @@ public partial class MainWindow : Window
                     if (Math.Abs(viewModel.CurrentSelection.BottomRight.Y - mousePosition.Y) < handleClickRadius * Board.Zoom) // Br handle
                     {
                         viewModel.CurrentHandle = SelectionHandle.BottomRight;
+                        Cursor = new Cursor(StandardCursorType.BottomRightCorner);
                     }
                     else if (Math.Abs(viewModel.CurrentSelection.TopLeft.Y - mousePosition.Y) < handleClickRadius * Board.Zoom) // Tr handle
                     {
                         viewModel.CurrentHandle = SelectionHandle.TopRight;
+                        Cursor = new Cursor(StandardCursorType.TopRightCorner);
                     }
                 }
                 else
@@ -262,7 +265,7 @@ public partial class MainWindow : Window
                             Math.Min(mousePosition.Y, viewModel.CurrentSelection.BottomRight.Y -handleClickRadius * Board.Zoom)),
                     _ => viewModel.CurrentSelection.TopLeft
                 };
-                var bottomRight = Board.CurrentHandle switch
+                var bottomRight = viewModel.CurrentHandle switch
                 {
                     SelectionHandle.BottomLeft => new Point(viewModel.CurrentSelection.BottomRight.X,
                             Math.Max(mousePosition.Y, viewModel.CurrentSelection.TopLeft.Y + handleClickRadius * Board.Zoom)),
@@ -316,9 +319,10 @@ public partial class MainWindow : Window
         if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
         {
             viewModel.CurrentHandle = SelectionHandle.None;
+            Cursor = arrow;
         }
         
-        //click place pixel
+        // Click place pixel
         if (paletteVm.CurrentColour is null) return;
         var mousePos = MouseOverPixel(e);
         var pixel = new Pixel((int)Math.Floor(mousePos.X), (int)Math.Floor(mousePos.Y), viewModel.CanvasWidth, paletteVm.CurrentColour ?? 0);
@@ -530,7 +534,7 @@ public partial class MainWindow : Window
         else
         {
             var encodedMsg = Encoding.UTF8.GetBytes(input);
-            var encodedChannel = Encoding.UTF8.GetBytes(liveChatVm.CurrentChannel.ChannelName);
+            var encodedChannel = Encoding.UTF8.GetBytes(liveChatVm.CurrentChannel.ChannelCode);
             var messageData = new Span<byte>(new byte[1 + 1 + 2 + encodedMsg.Length + 1 +
                 encodedChannel.Length + (false ? 4 : 0)]); // TODO: Current reply
             
@@ -724,12 +728,7 @@ public partial class MainWindow : Window
             // Hand over image to VM
         }
     }
-
-    private async void OnGithubCodeCancelClicked(object? sender, RoutedEventArgs e)
-    {
-        GithubCodePanel.IsVisible = false;
-    }
-
+    
     private async void OnLoadImageFromUrlClicked(object? sender, RoutedEventArgs e)
     {
         var imageUrl = ImageUrl.Text;

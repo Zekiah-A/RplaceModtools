@@ -9,9 +9,13 @@ public partial class LiveChatChannelViewModel : ObservableObject
     [ObservableProperty] private string channelName;
     [ObservableProperty] private ObservableCollection<LiveChatMessage> messages;
 
-    public LiveChatChannelViewModel(string channel)
+    public string ChannelCode { get => channelCode; }
+    private string channelCode;
+
+    public LiveChatChannelViewModel(string channelCode, string? channelName = null)
     {
-        channelName = channel;
+        this.channelCode = channelCode;
+        this.channelName = channelName ?? channelCode;
         messages = new ObservableCollection<LiveChatMessage>();
     }
 }

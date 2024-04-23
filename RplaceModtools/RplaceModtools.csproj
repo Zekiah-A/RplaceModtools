@@ -32,7 +32,7 @@
     <PackageReference Include="DynamicData" Version="8.4.1" />
     <PackageReference Include="LibGit2Sharp" Version="0.30.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
-    <PackageReference Include="SkiaSharp.Views.Desktop.Common" Version="2.88.7" />
+    <PackageReference Include="SkiaSharp.Views.Desktop.Common" Version="2.88.8" />
     <PackageReference Include="Websocket.Client" Version="5.1.1" />
   </ItemGroup>
 </Project>
