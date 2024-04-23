@@ -274,7 +274,7 @@ public partial class MainWindowViewModel : ObservableObject
                     // 2 - Open browser
                     if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
-                        Process.Start(code.VerificationUri);
+                        Process.Start("explorer", code.VerificationUri);
                     }
                     else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                     {
@@ -406,9 +406,14 @@ public partial class MainWindowViewModel : ObservableObject
                     await tempStream.FlushAsync();
                     File.Move(cacheTempPath, cachePath, true);
                     Backups.AddRange(newCommits);
+                    progressNotification.ResetPersistsTo(TimeSpan.FromSeconds(1));
+                }
+                else
+                {
+                    progressNotification.Notification = "Skipped loading new canvas backups from git. Using local cached backups (may be outdated)";
+                    progressNotification.ResetPersistsTo(TimeSpan.FromSeconds(5));
                 }
                 Backups.AddRange(caches);
-                RemoveStateInfo(progressNotification);
                 return;
             }
 
