@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
@@ -23,7 +25,6 @@ public partial class SkCanvas : UserControl
     private byte[]? board = null;
     private byte[]? changes = null;
     private byte[]? selectionBoard = null;
-    private SKImage? boardCache;
     private SKImage? changesCache;
     private SKImage? selectionCanvasCache;
     private byte[]? socketPixels;
@@ -33,6 +34,8 @@ public partial class SkCanvas : UserControl
     private SKPoint canvPosition = SKPoint.Empty;
     private List<SKPaint> paints = [];
     private PaletteViewModel paletteVm;
+    private SKRuntimeEffect boardEffect;
+    private SKShader? boardShader;
     
     public static readonly DirectProperty<SkCanvas, byte[]?> BoardProperty =
         AvaloniaProperty.RegisterDirect<SkCanvas, byte[]?>(nameof(Board),
@@ -80,7 +83,10 @@ public partial class SkCanvas : UserControl
         get => board;
         set
         {
-            boardCache = null;
+            if (value is not null)
+            {
+                boardShader = BindBoardEffect(value);
+            }
             SetAndRaise(BoardProperty, ref board, value);
             Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
         }
@@ -192,8 +198,59 @@ public partial class SkCanvas : UserControl
         {
             paints.Add(new SKPaint { Color = colour });
         }
+        boardEffect = CreateBoardEffect();
     }
 
+    private SKShader BindBoardEffect(byte[] board)
+    {
+        var boardInfo = new SKImageInfo((int)canvasWidth, (int)canvasHeight, SKColorType.Alpha8, SKAlphaType.Opaque);
+        var boardTex = SKImage.FromPixelCopy(boardInfo, board);
+        var boardTexShader = boardTex.ToShader();
+
+        // Cursed force interpret case as raw byte array
+        var paletteLength = paletteVm.PaletteColours.Length;
+        var paletteByteCount = paletteLength * sizeof(uint);
+        var paletteData = new byte[paletteByteCount];
+        Buffer.BlockCopy(paletteVm.PaletteColours, 0, paletteData, 0, paletteByteCount);
+        var paletteInfo = new SKImageInfo(paletteLength, 1, SKColorType.Rgba8888, SKAlphaType.Opaque);
+        var paletteTex = SKImage.FromPixelCopy(paletteInfo, paletteData);
+        if (paletteTex is null)
+        {
+            throw new NullReferenceException("Could not bind board effect, paletteTex was null");
+        }
+        var paletteTexShader = paletteTex.ToShader();
+
+        var children = new SKRuntimeEffectChildren(boardEffect)
+        {
+            { "canvTex", boardTexShader },
+            { "paletteTex", paletteTexShader }
+        };
+        var uniforms = new SKRuntimeEffectUniforms(boardEffect);
+
+        return boardEffect.ToShader(false, uniforms, children);
+    }
+
+    private SKRuntimeEffect CreateBoardEffect()
+    {
+        // GLSL code for your custom shader
+        var shaderSource = """
+            in fragmentProcessor canvTex;
+            in fragmentProcessor paletteTex;
+            half4 main(float2 uv)
+            {
+                /*uint index = uint(sample(canvTex, uv).r);
+                half3 colour = sample(paletteTex, float2(index, 0.5)).rgb / 255.0;
+                return half4(colour, 1.0);*/
+                return half4(1.0, 1.0, 1.0, 1.0);
+            }
+        """;
+        var effect = SKRuntimeEffect.Create(shaderSource, out var errors);
+        if (!string.IsNullOrEmpty(errors))
+        {
+            throw new Exception(errors);
+        }
+        return effect;
+    }
 
     private class CustomDrawOp : ICustomDrawOperation
     {
@@ -227,24 +284,17 @@ public partial class SkCanvas : UserControl
             canvas.Translate(parent.canvPosition.X, parent.canvPosition.Y);
 
             //Equivalent of renderAll
-            if (parent.boardCache is null && parent.Board is not null)
+            if (parent.board is not null && parent.boardShader is not null)
             {
-                using var img = new SKBitmap((int)parent.CanvasWidth, (int)parent.CanvasHeight, true);
-                for (var i = 0; i < Math.Min(parent.Board.Length, parent.CanvasWidth * parent.CanvasHeight); i++)
+                using var surface = SKSurface.Create(new SKImageInfo((int)parent.canvasWidth, (int)parent.canvasHeight));
+                var boardPaint = new SKPaint
                 {
-                    var colourI = parent.Board[i];
-                    if (colourI < parent.paletteVm.PaletteColours.Length)
-                    {
-                        img.SetPixel(
-                            (int)(i % parent.CanvasWidth),
-                            (int)(i / parent.CanvasWidth),
-                            parent.paletteVm.PaletteColours[colourI]);
-                    }
-                }
-
-                parent.boardCache = SKImage.FromBitmap(img);
+                    Shader = parent.boardShader
+                };
+                surface.Canvas.DrawPaint(boardPaint);
+                canvas.DrawImage(surface.Snapshot(), 0, 0);
             }
-            if (parent.changesCache is null && parent.Changes is not null)
+            /*if (parent.changesCache is null && parent.Changes is not null)
             {
                 var canvasWidth = (int) parent.CanvasWidth;
                 var canvasHeight = (int) parent.CanvasHeight;
@@ -261,15 +311,10 @@ public partial class SkCanvas : UserControl
                 
                 parent.changesCache = SKImage.FromBitmap(img);
             }
-
-            if (parent.boardCache is not null)
-            {
-                canvas.DrawImage(parent.boardCache, 0, 0);
                 
-                if (parent.changesCache is not null)
-                {
-                    canvas.DrawImage(parent.changesCache, 0, 0);
-                }
+            if (parent.changesCache is not null)
+            {
+                canvas.DrawImage(parent.changesCache, 0, 0);
             }
             else
             {
@@ -285,7 +330,7 @@ public partial class SkCanvas : UserControl
                 canvas.DrawRect(214, 214, 72, 72, dot); //centre
             }
             
-            //Draw all pixels that have come in to the canvas.
+            // Draw all pixels that have come in to the canvas.
             if (parent.socketPixels is not null)
             {
                 for (var c = 0; c < parent.socketPixels.Length; c++)
@@ -380,7 +425,7 @@ public partial class SkCanvas : UserControl
                     canvas.DrawCircle(new SKPoint((float) sel.BottomRight.X, (float) sel.TopLeft.Y), 4, selHandlePoint);
                     canvas.DrawCircle(new SKPoint((float) sel.BottomRight.X, (float) sel.BottomRight.Y), 4, selHandlePoint);
                 }
-            }
+            }*/
             
             canvas.Flush();
             canvas.Restore();

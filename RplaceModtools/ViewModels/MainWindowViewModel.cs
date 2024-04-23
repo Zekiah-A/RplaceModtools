@@ -505,7 +505,8 @@ public partial class MainWindowViewModel : ObservableObject
     
     private void BackupCheckInterval()
     {
-        var timer = new Timer
+        // TODO: This is messy - fix
+        /*var timer = new Timer
         {
             AutoReset = true,
             Interval = TimeSpan.FromMinutes(2).TotalMilliseconds
@@ -516,7 +517,7 @@ public partial class MainWindowViewModel : ObservableObject
             await FetchCacheBackupList();
         };
 
-        timer.Start();
+        timer.Start();*/
     }
     
     private void StateInfoInterval()
@@ -642,14 +643,13 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 case 0:
                 {
-                    // TODO: Slightly jank & cursed
                     var newPalette = MemoryMarshal.Cast<byte, uint>(msg.Binary.AsSpan()[1..]).ToArray();
                     Dispatcher.UIThread.Post(() => paletteVm.UpdatePalette(newPalette.ToArray()));
                     break;
                 }
                 case 1:
                 {
-                    // New server board info packet, superceedes packet 2, also used by old board for cooldown
+                    // New server board info packet, supercedes packet 2, also used by old board for cooldown
                     Cooldown = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan()[5..]);
 
                     // New server packs canvas width and height in code 1, making it 17, equivalent to packet 2
@@ -830,10 +830,9 @@ public partial class MainWindowViewModel : ObservableObject
         await Socket.Start();
     }
 
-    //Decompress changes so it can be put onto canv
+    // Decompress changes so it can be put onto canv
     private byte[] RunLengthChanges(Span<byte> data)
     {
-        // TODO: Fix possible misalignment causing messed up changes
         var i = 0;
         var changeI = 0;
         var changes = new byte[(int) (CanvasWidth * CanvasHeight)];
@@ -841,6 +840,7 @@ public partial class MainWindowViewModel : ObservableObject
         while (i < data.Length)
         {
             var cell = data[i++];
+            // Two MSB used for cell (colour) repeats
             var repeats = cell >> 6;
             switch (repeats)
             {
@@ -857,7 +857,7 @@ public partial class MainWindowViewModel : ObservableObject
                     break;
             }
             changeI += repeats;
-            changes[changeI] = (byte) (cell & 63);
+            changes[changeI++] = (byte) (cell & 63);
         }
         
         return changes;
@@ -999,10 +999,9 @@ public partial class MainWindowViewModel : ObservableObject
             Console.WriteLine("ERROR: Currently you need to enable 'view selected area at canvas backup' in order to rollback.");
             return;
         }
-		
+
         foreach (var selection in Selections)
         {
-        	Console.WriteLine("Selection");
             Rollback((int) selection.TopLeft.X, (int) selection.TopLeft.Y, (int) selection.BottomRight.X - (int) selection.TopLeft.X, 
                 (int) selection.BottomRight.Y - (int) selection.TopLeft.Y, SelectionBoard);
         }        

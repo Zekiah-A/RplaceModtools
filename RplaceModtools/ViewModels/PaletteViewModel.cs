@@ -15,6 +15,8 @@ public partial class PaletteViewModel : ObservableObject
 
     public SKColor[] PaletteColours;
 
+    public uint[] PaletteData;
+
     private static readonly SKColor[] defaultColours =
     {
         new(109, 0, 26),
@@ -68,6 +70,7 @@ public partial class PaletteViewModel : ObservableObject
 
     public void UpdatePalette(uint[] newPalette)
     {
+        PaletteData = newPalette;
     	var colours = newPalette.Select(colourInt =>
     		{
 			    var alpha = (byte) ((colourInt >> 24) & 255);
