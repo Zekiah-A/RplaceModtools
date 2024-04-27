@@ -80,11 +80,12 @@ public partial class MainWindow : Window
         
         InitializeComponent();
 
-        viewModel.BoardSetPixel = pixel => Board.Set(pixel);
-        viewModel.StartSelection = (tl, br) => Board.StartSelection(tl, br);
-        viewModel.UpdateSelection = (selection, tl, br) => Board.UpdateSelection(selection, tl, br);
-        viewModel.RemoveSelection = selection => Board.RemoveSelection(selection);
-        viewModel.ClearSelections = () => Board.ClearSelections();
+        viewModel.BoardSetPixel = Board.Set;
+        viewModel.BoardUnsetPixel = Board.Unset;
+        viewModel.StartSelection = Board.StartSelection;
+        viewModel.UpdateSelection = Board.UpdateSelection;
+        viewModel.RemoveSelection = Board.RemoveSelection;
+        viewModel.ClearSelections = Board.ClearSelections;
 
         PaletteListBox.DataContext = App.Current.Services.GetRequiredService<PaletteViewModel>();
         LiveChatGridContainer.DataContext = App.Current.Services.GetRequiredService<LiveChatViewModel>();

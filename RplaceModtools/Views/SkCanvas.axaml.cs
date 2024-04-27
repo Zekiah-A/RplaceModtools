@@ -246,7 +246,8 @@ public partial class SkCanvas : UserControl
             half4 main(float2 texCoords)
             {
                 float index = sample(boardTex, texCoords).a;
-                float paletteIndex = index * 255.0;
+                // Add 0,5 to end up at pixel centre during sample
+                float paletteIndex = index * 255.0 + 0.5;
                 half3 colour = sample(paletteTex, float2(paletteIndex, 0)).rgb;
                 return half4(colour, uint(paletteIndex) == 255 ? 0.0 : 1.0);
             }
@@ -493,8 +494,17 @@ public partial class SkCanvas : UserControl
         {
             return;
         }
-
         socketPixels[x + y * CanvasWidth] = 255;
+        Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
+    }
+
+    public void Unset(int index)
+    {
+        if (socketPixels is null)
+        {
+            return;
+        }
+        socketPixels[index] = 255;
         Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
     }
 }

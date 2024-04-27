@@ -40,7 +40,7 @@ public partial class MainWindowViewModel : ObservableObject
     private PaletteViewModel paletteVm = App.Current.Services.GetRequiredService<PaletteViewModel>();
     
     // TODO: Hack for now - later update to much better ObservableCollection to try and manage
-    public Action<Point, Point> StartSelection;
+    public Func<Point, Point, Selection> StartSelection;
     public Action<Selection, Point?, Point?> UpdateSelection;
     public Action<Selection> RemoveSelection;
     public Action ClearSelections;
@@ -109,6 +109,7 @@ public partial class MainWindowViewModel : ObservableObject
     };
     
     public Action<Pixel> BoardSetPixel { get; set; }
+    public Action<int> BoardUnsetPixel { get; set; }
 
     private const string GithubClientId = "3b37d31a1a87dd16d8e3";
     public static readonly string ProgramDirectory =
@@ -638,14 +639,12 @@ public partial class MainWindowViewModel : ObservableObject
             };
             wsClient.Options.SetRequestHeader("Origin", "https://rplace.live");
             wsClient.Options.SetRequestHeader("User-Agent", "RplaceModtools");
-            //wsClient.Options.SetRequestHeader("Cookies", tokenCookie);
             return wsClient;
         });
         Socket = new WebsocketClient(uri, factory)
         {
             ReconnectTimeout = TimeSpan.FromSeconds(10)
         };
-        
         Socket.MessageReceived.Subscribe(msg =>
         {
             var data = msg.Binary.AsSpan();
@@ -717,8 +716,8 @@ public partial class MainWindowViewModel : ObservableObject
                 case 7: // Rejected pixel
                 {
                     var index = BinaryPrimitives.ReadUInt32BigEndian(data[1..]);
-                    var colour = data[5];
-                    BoardSetPixel(new Pixel(index, colour));
+                    var colour = data[5]; // Ignore - We can just unset the pixel to save perf
+                    BoardUnsetPixel((int) index);
                     break;
                 }
                 case 8: // Canvas restriction
@@ -762,6 +761,10 @@ public partial class MainWindowViewModel : ObservableObject
                         if (pIntId == intId)
                         {
                             CurrentPreset.ChatUsername = pName;
+                            var nameNotification = App.Current.Services.GetRequiredService<NotificationStateInfoViewModel>();
+                            nameNotification.PersistsFor = TimeSpan.FromSeconds(3);
+                            nameNotification.Notification = $"Current username set to: {pName} by server";
+                            AddStateInfo(nameNotification);
                         }
                     }
 
