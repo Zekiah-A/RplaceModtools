@@ -716,7 +716,8 @@ public partial class MainWindowViewModel : ObservableObject
                 case 7: // Rejected pixel
                 {
                     var index = BinaryPrimitives.ReadUInt32BigEndian(data[1..]);
-                    var colour = data[5]; // Ignore - We can just unset the pixel to save perf
+                    // Ignore - We can just unset the pixel to save perf
+                    var colour = data[5];
                     BoardUnsetPixel((int) index);
                     break;
                 }

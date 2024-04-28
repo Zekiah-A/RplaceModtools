@@ -500,7 +500,7 @@ public partial class SkCanvas : UserControl
 
     public void Unset(int index)
     {
-        if (socketPixels is null)
+        if (socketPixels is null || index >= canvasWidth * canvasHeight)
         {
             return;
         }
