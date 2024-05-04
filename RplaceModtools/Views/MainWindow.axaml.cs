@@ -152,8 +152,8 @@ public partial class MainWindow : Window
             // Try find if we are near any of the current selection's handles,
             // if so we current that handle, otherwise, we will create a new selection
             if (viewModel.CurrentSelection is not null
-                && viewModel.CurrentSelection.TopLeft.X - 8 < mousePosition.X && Board.CurrentSelection.TopLeft.Y - 8 < mousePosition.Y
-                && viewModel.CurrentSelection.BottomRight.X + 8 > mousePosition.X && Board.CurrentSelection.BottomRight.Y + 8 > mousePosition.Y)
+                && viewModel.CurrentSelection.TopLeft.X - handleClickRadius < mousePosition.X && Board.CurrentSelection.TopLeft.Y - handleClickRadius < mousePosition.Y
+                && viewModel.CurrentSelection.BottomRight.X + handleClickRadius > mousePosition.X && Board.CurrentSelection.BottomRight.Y + handleClickRadius > mousePosition.Y)
             {
                 if (Math.Abs(viewModel.CurrentSelection.TopLeft.X - mousePosition.X) < handleClickRadius * Board.Zoom)
                 {
@@ -435,6 +435,16 @@ public partial class MainWindow : Window
                 }
             }
         });
+    }
+
+    private void OnAboutClicked(object? sender, RoutedEventArgs args)
+    {
+        AboutPanel.IsVisible = true;
+    }
+
+    private void OnCloseAboutClicked(object? sender, RoutedEventArgs args)
+    {
+        AboutPanel.IsVisible = false;
     }
 
     private void OnOpenGithubClicked(object? sender, RoutedEventArgs e)
