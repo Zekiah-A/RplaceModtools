@@ -653,20 +653,27 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 case 0:
                 {
-                    var newPalette = MemoryMarshal.Cast<byte, uint>(msg.Binary.AsSpan()[1..]).ToArray();
-                    Dispatcher.UIThread.Post(() => paletteVm.UpdatePalette(newPalette.ToArray()));
+                    var paletteLength = data[1];
+                    var usableRegionStart = data[2 + paletteLength];
+                    var usableRegionEnd = data[3 + paletteLength];
+                    var palette = data[2..(2 + paletteLength * sizeof(uint))];
+                    var newPalette = MemoryMarshal.Cast<byte, uint>(palette).ToArray();
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        paletteVm.UpdatePalette(newPalette);
+                    });
                     break;
                 }
                 case 1:
                 {
-                    // New server board info packet, supercedes packet 2, also used by old board for cooldown
-                    Cooldown = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan()[5..]);
+                    // New server board info packet, supersedes packet 2, also used by old board for cooldown
+                    Cooldown = BinaryPrimitives.ReadUInt32BigEndian(data[5..]);
 
                     // New server packs canvas width and height in code 1, making it 17, equivalent to packet 2
                     if (msg.Binary.Length == 17)
                     {
-                        CanvasWidth = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan()[9..]);
-                        CanvasHeight = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan()[13..]);
+                        CanvasWidth = BinaryPrimitives.ReadUInt32BigEndian(data[9..]);
+                        CanvasHeight = BinaryPrimitives.ReadUInt32BigEndian(data[13..]);
                         
                         Task.Run(async () =>
                         {
@@ -679,8 +686,8 @@ public partial class MainWindowViewModel : ObservableObject
                 case 2:
                 {
                     // Old board changes packet (contains board info and changes since fetched place file)
-                    CanvasWidth = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan()[1..]);
-                    CanvasHeight = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan()[5..]);
+                    CanvasWidth = BinaryPrimitives.ReadUInt32BigEndian(data[1..]);
+                    CanvasHeight = BinaryPrimitives.ReadUInt32BigEndian(data[5..]);
                     Task.Run(async () =>
                     {
                         Board = MainBoard = await BoardFetchSource.Task;
@@ -693,9 +700,9 @@ public partial class MainWindowViewModel : ObservableObject
                     var i = 1;
                     while (i < msg.Binary.Length)
                     {
-                        var position = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan(i)); i += 4;
+                        var position = BinaryPrimitives.ReadUInt32BigEndian(data[i..]); i += 4;
                         var colour = msg.Binary[i++];
-                        var intId = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan(i)); i += 4;
+                        var intId = BinaryPrimitives.ReadUInt32BigEndian(data[i..]); i += 4;
 
                         BoardSetPixel(new Pixel(position, colour));
                         intIdPositions[position] = intId;
@@ -707,7 +714,7 @@ public partial class MainWindowViewModel : ObservableObject
                     var i = 1;
                     while (i < msg.Binary.Length)
                     {
-                        var index = BinaryPrimitives.ReadUInt32BigEndian(msg.Binary.AsSpan(i)); i += 4;
+                        var index = BinaryPrimitives.ReadUInt32BigEndian(data[i..]); i += 4;
                         var colour = msg.Binary[i++];
                         BoardSetPixel(new Pixel(index, colour));
                     }
@@ -724,7 +731,7 @@ public partial class MainWindowViewModel : ObservableObject
                 case 8: // Canvas restriction
                 {
                     var locked = msg.Binary[1];
-                    var reason = Encoding.UTF8.GetString(msg.Binary[2..]);
+                    var reason = Encoding.UTF8.GetString(data[2..]);
                     var lockedNotification = App.Current.Services.GetRequiredService<NotificationStateInfoViewModel>();
                     AddStateInfo(lockedNotification);
                     lockedNotification.PersistsFor = TimeSpan.FromSeconds(60);
@@ -843,10 +850,9 @@ public partial class MainWindowViewModel : ObservableObject
         Socket.DisconnectionHappened.Subscribe(info =>
         {
             var disconnectNotification = App.Current.Services.GetRequiredService<NotificationStateInfoViewModel>();
-            disconnectNotification.PersistsFor = TimeSpan.FromSeconds(20);
+            disconnectNotification.PersistsFor = TimeSpan.FromSeconds(8);
             disconnectNotification.Notification = "Disconnected from server... Modtools may need a restart to continue.";
             AddStateInfo(disconnectNotification);
-            Console.WriteLine("Disconnected from server: {0}", info.Exception);
         });
         
         await Socket.Start();
@@ -1036,15 +1042,17 @@ public partial class MainWindowViewModel : ObservableObject
             Rollback((int) selection.TopLeft.X, (int) selection.TopLeft.Y, (int) selection.BottomRight.X - (int) selection.TopLeft.X, 
                 (int) selection.BottomRight.Y - (int) selection.TopLeft.Y, SelectionBoard);
         }        
-
     }
     
     private void Rollback(int x, int y, int regionWidth, int regionHeight, byte[] rollbackBoard)
     {
-        // TODO: Improve range checks here (even though server will likely fix regardless)
-        if (regionWidth > 250 || regionHeight > 250 || x >= CanvasWidth || y >= CanvasHeight)
+        if (x < 0 || y < 0 || regionWidth is <= 0 or > 256 || regionHeight is <= 0 or > 256
+            || x + regionWidth >= CanvasWidth || y + regionHeight >= CanvasHeight || Board is null)
         {
-        	Console.WriteLine("ERROR: Selected region is larger than maximum allowed rollback size");
+            var disconnectNotification = App.Current.Services.GetRequiredService<NotificationStateInfoViewModel>();
+            disconnectNotification.PersistsFor = TimeSpan.FromSeconds(8);
+            disconnectNotification.Notification = "Error: Selected region is larger than maximum allowed rollback size";
+            AddStateInfo(disconnectNotification);
             return;
         }
         
@@ -1067,6 +1075,16 @@ public partial class MainWindowViewModel : ObservableObject
         if (Socket is { IsRunning: true })
         {
             Socket.Send(buffer);
+        }
+        
+        // Perform rollback locally
+        var boardI = i;
+        var sourceI = 0;
+        while (sourceI < rollbackBoard.Length)
+        {
+            Array.Copy(rollbackBoard, sourceI, Board, boardI, regionWidth);
+            boardI += regionWidth;
+            sourceI += regionWidth;
         }
     }
 

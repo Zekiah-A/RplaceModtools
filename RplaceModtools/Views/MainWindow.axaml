@@ -1,12 +1,10 @@
 <?xml version="1.0" ?>
 <Window
-    Background="DarkGray"
+    Background="Transparent"
     Icon="/Assets/favicon.ico"
-    MinWidth="400"
     RequestedThemeVariant="{Binding CurrentTheme}"
     Title="RplaceModtools"
-    TransparencyBackgroundFallback="DarkGray"
-    TransparencyLevelHint="AcrylicBlur"
+    TransparencyLevelHint="Blur"
     d:DesignHeight="600"
     d:DesignWidth="1000"
     mc:Ignorable="d"
@@ -19,8 +17,50 @@
     xmlns:views="clr-namespace:RplaceModtools.Views"
     xmlns:vm="using:RplaceModtools.ViewModels"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <!--  Background="Transparent"  -->
     <Window.Styles>
+        <Style Selector="Border#PlaceConfigPanel">
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Width" Value="380" />
+        </Style>
+        <Style Selector="Grid#MainGrid.Portrait Border#PlaceConfigPanel">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="Width" Value="{Binding}" />
+        </Style>
+        <Style Selector="Grid#MainGrid Border#ToolsPanel">
+            <Style.Animations>
+                <Animation
+                    Duration="0:0:0.5"
+                    Easing="QuadraticEaseOut"
+                    FillMode="Forward">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="Margin" Value="0 0 -500 0" />
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="Margin" Value="0" />
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+        <Style Selector="Grid#MainGrid.Portrait Border#ToolsPanel">
+            <Style.Animations>
+                <Animation
+                    Duration="0:0:0.5"
+                    Easing="QuadraticEaseOut"
+                    FillMode="Forward">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="Margin" Value="0" />
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="Margin" Value="0 0 -500 0" />
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+        <Style Selector="Grid#MainGrid.Portrait Border#PlaceConfigPanel" />
         <Style Selector="Image.PlaceLogo">
             <Setter Property="Height" Value="100" />
             <Setter Property="Width" Value="100" />
@@ -75,37 +115,6 @@
                 </Animation>
             </Style.Animations>
         </Style>
-        <!--  TODO: Should use transition instead  -->
-        <Style Selector="Border.ToolsPanelOpen">
-            <Style.Animations>
-                <Animation
-                    Duration="0:0:0.5"
-                    Easing="QuadraticEaseOut"
-                    FillMode="Forward">
-                    <KeyFrame Cue="0%">
-                        <Setter Property="Margin" Value="0" />
-                    </KeyFrame>
-                    <KeyFrame Cue="100%">
-                        <Setter Property="Margin" Value="0 0 -500 0" />
-                    </KeyFrame>
-                </Animation>
-            </Style.Animations>
-        </Style>
-        <Style Selector="Border.ToolsPanelClose">
-            <Style.Animations>
-                <Animation
-                    Duration="0:0:0.5"
-                    Easing="QuadraticEaseOut"
-                    FillMode="Forward">
-                    <KeyFrame Cue="0%">
-                        <Setter Property="Margin" Value="0 0 -500 0" />
-                    </KeyFrame>
-                    <KeyFrame Cue="100%">
-                        <Setter Property="Margin" Value="0" />
-                    </KeyFrame>
-                </Animation>
-            </Style.Animations>
-        </Style>
         <!--  Palette colour select panel styles  -->
         <Style Selector="Border.DoneButton">
             <Setter Property="Background" Value="{DynamicResource PanelBackgroundBrush}" />
@@ -152,13 +161,9 @@
         <Border
             Background="{DynamicResource PanelBackgroundBrush}"
             BoxShadow="0 0 20 2 Gray"
-            CornerRadius="10"
             Grid.Column="0"
             Grid.ColumnSpan="2"
-            HorizontalAlignment="Center"
             IsVisible="{Binding StartedAndConfigured, Converter={StaticResource NotConverter}}"
-            VerticalAlignment="Center"
-            Width="380"
             ZIndex="8"
             x:Name="PlaceConfigPanel">
             <Grid RowDefinitions="*, Auto">
@@ -476,13 +481,11 @@
             </StackPanel>
         </Border>
         <Panel
+            Background="{DynamicResource WindowBackgroundBrush}"
             Grid.Column="0"
             HorizontalAlignment="Stretch"
             VerticalAlignment="Stretch"
             x:Name="CanvasBackground">
-            <Panel.Background>
-                <SolidColorBrush Color="White" Opacity="0.8" />
-            </Panel.Background>
             <views:SkCanvas
                 Board="{Binding Board}"
                 CanvasHeight="{Binding CanvasHeight}"

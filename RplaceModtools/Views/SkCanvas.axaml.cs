@@ -488,16 +488,6 @@ public partial class SkCanvas : UserControl
         }
     }
     
-    public void Unset(int x, int y)
-    {
-        if (socketPixels is null)
-        {
-            return;
-        }
-        socketPixels[x + y * CanvasWidth] = 255;
-        Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
-    }
-
     public void Unset(int index)
     {
         if (socketPixels is null || index >= canvasWidth * canvasHeight)
